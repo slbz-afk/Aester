@@ -4,7 +4,7 @@ Aester 完整免费。支持开发完全自愿，不解锁任何功能，也不�
 
 Aester is free to use. Supporting development is entirely optional and does not unlock features or affect access to the application.
 
-## 不花钱也能帮忙 / Ways to help without money
+## 帮忙开发 / Ways to help
 
 - **反馈问题**：在 [Issues](https://github.com/slbz-afk/Aester/issues) 报告问题，或用你的相机试用后告诉我们结果。
   Report problems in [Issues](https://github.com/slbz-afk/Aester/issues), or tell us how Aester works with your camera.
