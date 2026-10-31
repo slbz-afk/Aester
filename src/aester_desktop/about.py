@@ -13,6 +13,7 @@ from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import QDialog, QDialogButtonBox, QTextBrowser, QVBoxLayout
 
 import aester_desktop
+from starstack import PRODUCT_VERSION
 from starstack.i18n import tr
 
 from . import themes
@@ -38,6 +39,7 @@ def about_markdown() -> str:
     ]
     return "\n\n".join([
         "## Aester",
+        tr('版本 {0}').format(PRODUCT_VERSION),
         aester_desktop.__copyright__,
         tr('Aester 是自由软件，完整免费；支持开发完全自愿，不解锁任何功能。'),
         tr('桌面程序按 GNU 通用公共许可证第 3 版或（由您选择）任何更新版本授权：您可以按该许可证再分发和修改它。'

@@ -9,4 +9,6 @@ from .install_lifecycle import ensure_process_lease as _ensure_install_lease
 
 _ensure_install_lease(__file__)
 
-__version__ = "0.2.0rc1"
+__version__ = "1.0.0rc1"
+# The product version shown to users (installer, About dialog); PEP 440 form of the release tag v1.0.0-rc.1.
+PRODUCT_VERSION = __version__

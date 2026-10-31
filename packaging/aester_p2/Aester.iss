@@ -10,8 +10,14 @@
 #ifndef AppIdentity
   #define AppIdentity "BD0B9C56-1F68-4D33-9C51-208037FC67B7"
 #endif
+#ifndef ProductVersion
+  #define ProductVersion "dev"
+#endif
+#ifndef AppVersionNumber
+  #define AppVersionNumber "0.0.0"
+#endif
 #ifndef InstallerName
-  #define InstallerName "Aester-P2-" + VersionId + "-Setup"
+  #define InstallerName "Aester-" + ProductVersion + "-" + VersionId + "-Setup"
 #endif
 #ifndef AppMB
   #define AppMB "60"
@@ -27,8 +33,8 @@
 [Setup]
 AppId={{{#AppIdentity}}
 AppName=Aester
-AppVersion=0.2.0.24
-AppVerName=Aester P2 Preview
+AppVersion={#AppVersionNumber}
+AppVerName=Aester {#ProductVersion}
 AppPublisher=Aester Project
 DefaultDirName={localappdata}\Programs\Aester
 DefaultGroupName=Aester

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "starstack-prototype"
-version = "0.2.0rc1"
+version = "1.0.0rc1"
 description = "Local Siril-backed nightscape processing prototype"
 requires-python = ">=3.12"
 dependencies = ["numpy>=2,<3", "astropy>=7,<9", "Pillow>=11,<13", "tifffile>=2025"]
