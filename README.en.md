@@ -10,6 +10,8 @@ Aester is free and open source. Supporting development is voluntary and unlocks 
 
 [中文](README.md) · [Download](https://github.com/slbz-afk/Aester/releases) · [User guide](docs/USER_GUIDE_EN.md) · [Issues](https://github.com/slbz-afk/Aester/issues) · [Support](SUPPORT.md)
 
+![Aester: 48 frames of the Tengger Desert stacked, 9 meteors added back automatically](docs/images/aester-en.png)
+
 ## How it works
 
 The window follows six stages:
@@ -28,6 +30,7 @@ The window follows six stages:
 
 - **Keep meteors and other trails**: the base image is finished first. Reliably measured meteors are then added back and saved as a separate version, with a review screen to change each decision.
 - **Star cleanup**: needs the optional nox component. It separates stars from the background and reduces them by 0–100%. You can also save starless and star layers.
+  **1.0.0-rc.1 does not offer the nox download yet**: the rights to the third-party model's training data are still being checked, so this feature is unavailable until then.
 - **Enhance the Milky Way**: a graded enhancement inside the drawn Milky Way ellipse only.
 
 See the [user guide](docs/USER_GUIDE_EN.md) for details.
@@ -58,7 +61,7 @@ Run `starstack devices` for the full list. Reports with your camera are welcome.
 ## Known limitations
 
 - **Not every scene comes out right straight away.** Clouds, obstructions, trees moving in the wind, strong light pollution and colour fringing remain hard. Deep-sky images from smart telescopes have basic support only.
-- **Star separation is an algorithmic estimate**; bright stars may keep a residual halo.
+- **Star cleanup is not available yet** (see above). When it is, it remains an algorithmic estimate; bright stars may keep a residual halo.
 - **Meteor add-back covers reliably measured meteors only**; other trails are left for manual review.
 - **Retouching needs GIMP 3.2.6** and your own AI assistant with MCP and image support.
 - **Little testing on other PCs.** Testing on other computers and on high-DPI multi-monitor setups is still limited. Please [report problems](https://github.com/slbz-afk/Aester/issues).
