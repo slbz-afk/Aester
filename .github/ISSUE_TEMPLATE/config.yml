@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题 / Security problem
+    url: https://github.com/slbz-afk/Aester/security/policy
+    about: 请私下报告，不要公开提交 / Please report privately, not in a public issue

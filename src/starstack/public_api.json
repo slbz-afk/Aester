@@ -1,0 +1,182 @@
+{
+ "api_version": 1,
+ "modules": {
+  "background_job": {
+   "render_background": "(job_dir, mask_path=None, recipe_path=None, *, mode=None, strength=None, red_gain=None, blue_gain=None)"
+  },
+  "cache_cleanup": {
+   "clean_workflow_cache": "(workflow_dir, plan_id) -> 'dict'",
+   "list_workflow_caches": "(roots, *, cancelled=None) -> 'dict'"
+  },
+  "camera_looks": {
+   "LOOKS": "constant:dict",
+   "camera_of": "(master_meta: 'dict') -> 'dict | None'"
+  },
+  "components": {
+   "component_status": "(component_root=None) -> 'dict'",
+   "install_components": "(component_root=None, *, include_star_support=False, progress=None, cache_dir=None, app_root=None, model_source=None, manifest=None, activate=True, download_source='auto', download_model=False, cancelled=None) -> 'dict'",
+   "install_finite_backend": "(component_root=None, *, source=None, app_root=None) -> 'dict'",
+   "install_nox_support": "(component_root=None, *, consent=False, model_source=None, progress=None, cancelled=None, cache_dir=None, app_root=None) -> 'dict'",
+   "install_retouch_components": "(component_root=None, *, include_gimp=True, include_skill=True, progress=None, app_root=None, cache_dir=None, gimp_source=None, selected_gimp_path=None, skill_source=None, download_source='auto') -> 'dict'",
+   "nox_install_info": "(app_root=None) -> 'dict'"
+  },
+  "core": {
+   "RAW": "constant:set",
+   "cancel_job": "(job_dir: str) -> None",
+   "create_demo": "(output_root: str) -> str",
+   "doctor": "(siril_path: str | None = None) -> dict",
+   "load_job": "(job_dir: str | pathlib.Path) -> dict",
+   "recompose_transients": "(job_dir: str, *, labels: dict | None = None, overrides: dict | None = None, policy: dict | None = None, marks: list | None = None, notes: dict | None = None, layer_style: str | None = None, expected_revision: dict | None = None, default_keep_rule: str | None = None, reviewer: str | None = None) -> dict",
+   "resume_job": "(job_dir: str) -> dict",
+   "submit_job": "(input_dir: str | None, output_root: str, siril_path: str | None = None, sky_mask_path: str | None = None, idempotency_key: str | None = None, frame_masks_dir: str | None = None, transient_marks: list | str | None = None, support_mode: str = 'legacy', stack_range_mode: str = 'legacy', force_restart: bool = False, stack_engine_path: str | None = None, input_files: list[str] | None = None, transient_mode: str | None = None, color_adjustments: dict | None = None, compose_feather_mode: str | None = None, image_rotation: int | None = None) -> dict"
+  },
+  "devices": {
+   "lookup": "(make: 'str | None', model: 'str | None') -> 'dict | None'"
+  },
+  "editing_project": {
+   "load_project": "(path)",
+   "save_project": "(path, state, reference, project)"
+  },
+  "finishing_cli": {
+   "add_host_arguments": "(parser)",
+   "configured_service": "(args)"
+  },
+  "finishing_components": {
+   "INSTALL_URL": "constant:str",
+   "discover_gimp": "(selected_path=None, *, probe=False, timeout=5.0) -> 'dict'"
+  },
+  "finishing_session": {
+   "RevisionConflict": "class"
+  },
+  "finite_backend_assets": {
+   "discover_finite_backend": "(app_root=None, environ=None, component_root=None)"
+  },
+  "i18n": {
+   "get_language": "() -> 'str'",
+   "normalize_language": "(value) -> 'str'",
+   "register_catalogs": "(*modules: 'str') -> 'None'",
+   "set_language": "(language: 'str') -> 'str'",
+   "startup_language": "(settings=None) -> 'str'",
+   "tr": "(source: 'str', *args, **kwargs) -> 'str'",
+   "translate_message": "(text, language: 'str | None' = None) -> 'str'"
+  },
+  "jpeg_estimate": {
+   "DEFAULT": "constant:int",
+   "MAXIMUM": "constant:int",
+   "MINIMUM": "constant:int",
+   "PREVIEW_EDGE": "constant:int",
+   "estimate_from_preview": "(preview, full_width, full_height, quality, *, icc=None) -> 'int'",
+   "estimate_without_preview": "(full_width, full_height, quality) -> 'int'",
+   "load_preview": "(path, *, max_edge=None)",
+   "megabytes": "(size) -> 'str'",
+   "validate_quality": "(value)"
+  },
+  "onboarding": {
+   "checked_directory": "(value, *, exists=False) -> 'Path'",
+   "connection_config": "(input_root, output_root, cache_root, *, python_path=None, source_root=None, siril_path=None, stack_engine_path=None, star_model_path=None, backend_options=None, language=None, dng_converter_path=None, gimp_path=None) -> 'dict'",
+   "probe_connection": "(config: 'dict', *, timeout=35.0) -> 'dict'",
+   "setup_prompt": "(config: 'dict', language=None) -> 'str'"
+  },
+  "overlay_colors": {
+   "DASH": "constant:str",
+   "DASH_PATTERN": "constant:tuple",
+   "DOT": "constant:str",
+   "DOT_PATTERN": "constant:tuple",
+   "DOUBLE_GAP": "constant:float",
+   "HANDLE": "constant:str",
+   "HANDLE_RADIUS": "constant:float",
+   "LINE_WIDTH": "constant:float",
+   "OUTLINE": "constant:str",
+   "OUTLINE_EXTRA": "constant:float",
+   "OVERLAYS": "constant:mappingproxy",
+   "SOLID": "constant:str",
+   "TRAIL_IDENTITY": "constant:mappingproxy",
+   "TRAIL_KEPT_LINE": "constant:str",
+   "TRAIL_OMITTED_LINE": "constant:str",
+   "rgba": "(name: 'str', alpha: 'int' = 255) -> 'tuple[int, int, int, int]'"
+  },
+  "photographic_job": {
+   "MilkywayConfirmationChanged": "class",
+   "finish_milkyway": "(source, output_root, sky_mask, protected_mask, milkyway_mask, *, brightness=0.02, contrast=0.6, structure=0.9, color=0.35, strength=0.6, transient_background=None, starless_background=None, milkyway_evidence=None, check=None, jpeg_quality=None)",
+   "milkyway_confirmation": "(source, mask)",
+   "write_milkyway_review": "(confirmation, source, mask, directory, *, reviewer, rationale)"
+  },
+  "preview": {
+   "render_job_preview": "(job_dir: str, red_gain: float = 1.0, blue_gain: float = 1.0, exposure_ev: float = 0.0) -> dict"
+  },
+  "raw_audit": {
+   "inspect_raw": "(source_path: 'str | Path', output_root: 'str | Path') -> 'dict'"
+  },
+  "raw_import": {
+   "ADOBE_DOWNLOAD_URL": "constant:str",
+   "find_converter": "(selected=None, *, environ=None) -> 'dict'",
+   "prepare_import": "(input_files, cache_root, *, converter_path=None, force_dng=False, cancelled=None, progress=None, allow_converter_discovery=True) -> 'dict'"
+  },
+  "references": {
+   "prepare_reference": "(input_dir: str | None, output_root: str, siril_path: str | None = None, *, input_files=None, color_adjustments=None, image_rotation=None) -> dict",
+   "render_reference": "(reference_dir, *, color_adjustments=None, quality='standard')",
+   "rotate_reference": "(reference_dir, *, image_rotation, _record=None)"
+  },
+  "region_preview": {
+   "overlay_rgba": "(sky: 'np.ndarray', milkyway: 'np.ndarray') -> 'np.ndarray'"
+  },
+  "regions": {
+   "build_masks": "(project_or_path, output_root, *, input_files=None)",
+   "clear_landscape": "(project)",
+   "clear_milkyway": "(project)",
+   "create_project": "(reference, input_files)",
+   "draw_milkyway": "(project, ellipse, *, angle_degrees=None, feather=None, authority='human', reviewer='GUI user', rationale='Explicit Milky Way drawing')",
+   "load_project": "(path, *, input_files=None, verify_sources=True)",
+   "milkyway_active": "(project)",
+   "normalize_marks": "(project)",
+   "rasterize": "(project, width=None, height=None)",
+   "revise": "(project, *, operations=None, scene_mode=None, milkyway=None)",
+   "save_project": "(project, output_root)",
+   "scene_from_marks": "(project)",
+   "suggest_horizon": "(preview_rgb, points, band=0.035)",
+   "validate_project": "(project, *, input_files=None, verify_sources=True)"
+  },
+  "retouch_distribution": {
+   "describe_notices": "(notices, language='zh_CN')"
+  },
+  "retouch_integration": {
+   "build_retouch_prompt": "(*, photo_path=None, intent=None, app_root=None, gimp_path=None, component_root=None, language='zh_CN', reference_images=None) -> 'str'",
+   "get_retouch_info": "(*, app_root=None, gimp_path=None, component_root=None) -> 'dict'"
+  },
+  "star_layer_export": {
+   "export_star_layers": "(separation_result, output_root, *, allowed_root=None)"
+  },
+  "star_reduction": {
+   "reduce_stars": "(separation_result, output_root, *, strength=0.55, bright_start=0.1, bright_end=0.45, milkyway_mask=None, milkyway_evidence=None, milkyway_relief=0.5, bright_radius=None, allowed_root=None, background_strength=None, milkyway_offset=-0.2, check=None, jpeg_quality=None)",
+   "suggest_star_reduction": "(separation_result, output_root, *, milkyway_mask=None, milkyway_evidence=None, allowed_root=None)"
+  },
+  "storage": {
+   "default_cache_root": "()"
+  },
+  "trail_review_session": {
+   "candidate_context": "(session_path: 'str', candidate_id: 'str') -> 'dict'",
+   "list_trail_candidates": "(job_dir) -> 'dict'",
+   "open_review": "(job_dir: 'str') -> 'dict'",
+   "save_review": "(session_path: 'str', decisions: 'dict', *, reviewer: 'str' = 'human', expected_draft_revision: 'str', options: 'dict | None' = None) -> 'dict'"
+  },
+  "user_guide": {
+   "guide_text": "(language=None) -> str"
+  },
+  "workflow": {
+   "cancel_workflow": "(workflow_dir)",
+   "resume_workflow": "(workflow_dir)",
+   "submit_workflow": "(input_dir, output_root, *, siril_path=None, sky_mask_path=None, stack_engine_path=None, star_model_path=None, background_strength=None, milkyway_offset=0.0, backend_options=None, idempotency_key=None, stack_range_mode='legacy', input_files=None, trails_enabled=False, stars_enabled=False, color_adjustments=None, regions_path=None, milkyway_enabled=False, milkyway_strength=0.6, delivery_root=None, delivery_format=None, image_rotation=None, trail_default=None, save_starless=False, save_star_layer=False, jpeg_quality=None)",
+   "workflow_status": "(workflow_dir)"
+  },
+  "workflow_edit": {
+   "apply_review": "(workflow_dir, session_path, *, expected_revision=None, expected_draft_revision=None)",
+   "trail_rederive_scope": "(directory)"
+  }
+ },
+ "note": "The engine names the desktop app uses; generated by scripts/split/api_surface.py. Changing one of these is an API change for the app.",
+ "record_files": [
+  "job.json",
+  "workflow.json",
+  "audit.json"
+ ]
+}

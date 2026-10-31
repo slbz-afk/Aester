@@ -1,0 +1,5 @@
+{
+  "description": "Shrink-only: scanned backend message templates that translate_message cannot render in English yet. Remove entries once translations_messages.py covers them; never add new ones to silence the scan.",
+  "count": 0,
+  "untranslated": []
+}

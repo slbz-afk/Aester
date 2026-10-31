@@ -1,0 +1,19 @@
+name: 功能建议 / Feature request
+description: 希望 Aester 增加或改进的功能 / Something you would like Aester to do or do better
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: 想解决的问题 / The problem
+      description: 你在拍摄或后期中遇到了什么情况 / What happens in your shooting or editing
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 希望的做法 / What you would like
+  - type: input
+    id: camera
+    attributes:
+      label: 相关相机或素材类型 / Camera or material, if relevant

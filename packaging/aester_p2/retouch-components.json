@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "reviewed": "2026-09-27",
+  "gimp": {
+    "version": "3.2.6",
+    "filename": "gimp-3.2.6-setup.exe",
+    "url": "https://download.gimp.org/gimp/v3.2/windows/gimp-3.2.6-setup.exe",
+    "size": 190358080,
+    "sha256": "9337cccbc01d4098ee7a3dab215b3afbe6ece99c5287c92441d6f12cf541ebca",
+    "hash_authority": "https://www.gimp.org/downloads/",
+    "license": "GPL-3.0-or-later; bundled upstream dependencies retain their own licenses",
+    "license_url": "https://www.gimp.org/about/COPYING",
+    "delivery": "Download the unmodified installer from the official upstream service or a listed mirror (components.DOWNLOAD_SOURCES, family gimp), whichever measures faster, pinned by size and SHA-256; not bundled or repackaged by Aester",
+    "ownership": "Independent GIMP installation, never adopted or removed by Aester",
+    "main_source": {
+      "url": "https://download.gimp.org/gimp/v3.2/gimp-3.2.6.tar.xz",
+      "size": 35004888,
+      "sha256": "40b15e90ad0c0c631b76da3c467ea9847fa5c24f37413ac5b492804860a28cd8",
+      "verified_locally": true,
+      "scope": "Main GIMP source including build/windows/installer/gimp-setup.iss; not every bundled dependency source"
+    },
+    "existing_installation": "Reuse compatible existing selection; never upgrade or overwrite existing installations or occupied targets",
+    "failure_boundary": "No Aester active pointer change. Independently installed GIMP remains separately removable through Windows Settings."
+  },
+  "skill": {
+    "version": "nl2-v5.1",
+    "source": "skills/aester-retouch/SKILL.md",
+    "archive": "skills/aester-retouch.zip",
+    "contents": "Seven reviewed text files; no tutorial images, photographs, credentials or runtime",
+    "global_install_performed": false
+  }
+}

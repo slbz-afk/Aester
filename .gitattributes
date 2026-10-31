@@ -1,0 +1,3 @@
+# Keep every file byte-for-byte as committed on every platform. Several files are pinned by SHA-256 (the retouch
+# skill, installer manifests and fonts), so Git must not convert line endings on checkout or commit.
+* -text

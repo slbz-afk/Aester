@@ -1,0 +1,26 @@
+{
+  "author": "Fable independent review",
+  "delivery": "2026-09-16",
+  "adaptations": [
+    "remove snapshot import override",
+    "F1/F2/F4 expected behavior follows accepted fixes",
+    "rename misleading failed-run recipe test; assertions unchanged"
+  ],
+  "files": [
+    {
+      "original": "delegation\\fable_process_guard\\float_color_review_20260916\\review\\test_independent_color.py",
+      "original_sha256": "1b75b0fc53dec07d828b89c1917463cc814b86931d5da3f0399634778a54fd0f",
+      "integrated": "tests\\fable_float_color\\test_fable_color.py"
+    },
+    {
+      "original": "delegation\\fable_process_guard\\float_color_review_20260916\\review\\test_independent_demosaic.py",
+      "original_sha256": "ebbffff148aa6cf9c1b1bff3ddb31c7412d244d541f4e5d6a2bca901c253c7fe",
+      "integrated": "tests\\fable_float_color\\test_fable_demosaic.py"
+    },
+    {
+      "original": "delegation\\fable_process_guard\\float_color_review_20260916\\review\\test_independent_develop.py",
+      "original_sha256": "dcc20ed60db73d14365d6ee998e800550a7834b7e9ce6d6741d31efaee85bf46",
+      "integrated": "tests\\fable_float_color\\test_fable_develop.py"
+    }
+  ]
+}

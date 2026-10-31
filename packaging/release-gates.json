@@ -1,0 +1,8 @@
+{
+ "schema": "aester-release-gates-1",
+ "note": "Manual release gates read by scripts/build_aester_installer.py (release_gates). A --channel release build refuses while any gate is not closed.",
+ "manual": {
+  "nox_rights": {"state": "open", "note": "2026-10-15 package B: user chose no bundled model plus first-launch opt-in installation; this delivery change does not resolve the outstanding training-data rights review"},
+  "nox_download": {"state": "open", "note": "2026-10-15: production ONNX hosting URL is not configured; localhost fixtures do not verify public delivery"}
+ }
+}

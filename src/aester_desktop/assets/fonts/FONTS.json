@@ -1,0 +1,82 @@
+{
+ "fetched": "2026-09-27",
+ "files": [
+  {
+   "file": "IBMPlexMono-Medium.ttf",
+   "bytes": 136704,
+   "sha256": "a9b4c49bb299e05b5f6c481e7fb5e78943d2793249a0c8874ab574a2d1ea6755",
+   "source": "https://raw.githubusercontent.com/google/fonts/0b58fb370093f9a9f4ff785d94405710b79de67c/ofl/ibmplexmono/IBMPlexMono-Medium.ttf",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "IBMPlexMono-Regular.ttf",
+   "bytes": 135580,
+   "sha256": "6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46",
+   "source": "https://raw.githubusercontent.com/google/fonts/0b58fb370093f9a9f4ff785d94405710b79de67c/ofl/ibmplexmono/IBMPlexMono-Regular.ttf",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "IBMPlexSans-Medium.ttf",
+   "bytes": 202460,
+   "sha256": "331c8639d7598b2cde62a911a71db195e30cb655cd6bdf2e324a7e984955f907",
+   "source": "https://github.com/IBM/plex/releases/download/@ibm/plex-sans@1.1.0/ibm-plex-sans.zip (fonts/complete/ttf)",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "IBMPlexSans-Regular.ttf",
+   "bytes": 200500,
+   "sha256": "975dcda37d80f038dcd143c22e33ca2d97a0cc5a929aace1c749153b0fe1afa5",
+   "source": "https://github.com/IBM/plex/releases/download/@ibm/plex-sans@1.1.0/ibm-plex-sans.zip (fonts/complete/ttf)",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "IBMPlexSans-SemiBold.ttf",
+   "bytes": 202632,
+   "sha256": "a20caf8286023a6a7a85e40b1d2a4ae9fc3e3b1f9eda8f4c542dd4986af67bb1",
+   "source": "https://github.com/IBM/plex/releases/download/@ibm/plex-sans@1.1.0/ibm-plex-sans.zip (fonts/complete/ttf)",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "LXGWWenKaiLite-Regular.ttf",
+   "bytes": 13872424,
+   "sha256": "140c99ba4e28e817cec49bf82a0c5fcdc4fe633fb9dfda16d0ee8d59a8545f15",
+   "source": "https://github.com/lxgw/LxgwWenKai-Lite/releases/download/v1.522/LXGWWenKaiLite-Regular.ttf",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "NotoSansSC-Medium.otf",
+   "bytes": 8345436,
+   "sha256": "7633f5a016d4dd95e685a69633d818aabc4644c4b08e26bd35b1b30c45ed5dda",
+   "source": "https://raw.githubusercontent.com/notofonts/noto-cjk/165c01b46ea533872e002e0785ff17e44f6d97d8/Sans/SubsetOTF/SC/NotoSansSC-Medium.otf",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "NotoSansSC-Regular.otf",
+   "bytes": 8331336,
+   "sha256": "faa6c9df652116dde789d351359f3d7e5d2285a2b2a1f04a2d7244df706d5ea9",
+   "source": "https://raw.githubusercontent.com/notofonts/noto-cjk/165c01b46ea533872e002e0785ff17e44f6d97d8/Sans/SubsetOTF/SC/NotoSansSC-Regular.otf",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "OFL-IBMPlex.txt",
+   "bytes": 4456,
+   "sha256": "7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da",
+   "source": "https://github.com/IBM/plex/releases/download/@ibm/plex-sans@1.1.0/ibm-plex-sans.zip (LICENSE.txt)",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "OFL-LXGWWenKai.txt",
+   "bytes": 4448,
+   "sha256": "c38b1994a5e48ac30ac7d1da7d0409fd8fd8127dfe28a13d6e787d5b1ef34a5e",
+   "source": "https://raw.githubusercontent.com/lxgw/LxgwWenKai-Lite/v1.522/OFL.txt",
+   "licence": "SIL OFL 1.1"
+  },
+  {
+   "file": "OFL-NotoSansCJK.txt",
+   "bytes": 4301,
+   "sha256": "6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2",
+   "source": "https://raw.githubusercontent.com/notofonts/noto-cjk/165c01b46ea533872e002e0785ff17e44f6d97d8/LICENSE",
+   "licence": "SIL OFL 1.1"
+  }
+ ]
+}

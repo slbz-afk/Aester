@@ -1,0 +1,42 @@
+name: 问题报告 / Bug report
+description: Aester 出错、崩溃或结果明显不对 / Something fails, crashes or gives a clearly wrong result
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请不要在这里公开私人 RAW 原片；先描述场景，需要文件时我们再约定私下传递。
+        Please do not post private RAW files here; describe the scene first, and we will agree on a private way to share files if needed.
+  - type: input
+    id: version
+    attributes:
+      label: Aester 版本 / Version
+      description: 帮助 → 关于 Aester，或安装包文件名 / Help → About Aester, or the installer file name
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: Windows 版本与相机 / Windows version and camera
+      placeholder: Windows 11 23H2, Nikon Z 8
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 操作步骤 / Steps
+      description: 用了几张照片、画了哪些分区、打开了哪些可选效果 / How many photos, which regions, which optional effects
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 实际结果与期望 / What happened and what you expected
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: 详情或日志 / Details or log
+      description: 窗口底部“详情”里的消息，或任务目录中的日志 / The message under "Details", or the job's log
+      render: text

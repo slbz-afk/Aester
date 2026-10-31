@@ -1,0 +1,16 @@
+# Which parts of Aester are under Apache-2.0 and which under GPL-3.0-or-later (LICENSING.md).
+# Read by tests/test_open_core_boundary.py.
+
+[gpl]
+# GPL-3.0-or-later: the desktop application, its tests and its GUI tools. The Apache-2.0 engine must never depend
+# on it.
+paths = [
+    "src/aester_desktop/**",
+    "tests/desktop/**",
+    "scripts/launch_retouch.py",
+    "scripts/Start-Aester-Retouch.cmd",
+]
+
+[internal]
+# Local work folders (ignored by git), skipped by the boundary checks.
+paths = ["outputs/**", "data/**", "tools/**"]

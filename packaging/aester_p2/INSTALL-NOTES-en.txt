@@ -1,0 +1,14 @@
+Aester P2 Preview
+
+The installer downloads about 290 MB of core components.
+Setup first times the official servers and the listed mirrors, then downloads from the fastest; every file is checked against its pinned size and SHA-256.
+The nox model is not bundled. On first launch you may opt in to downloading the verified 218 MB model and about 15 MB of CPU runtime files, once a download endpoint has been configured. You can defer this or choose an existing compatible model in component management. Its output is an algorithmic estimate; high-quality starless deep-sky images are not guaranteed.
+
+{{FINITE_COMPONENT_NOTE}}
+
+Keep your internet connection active until installation finishes. Afterwards, both the GUI and MCP can start offline without a system Python installation or command-line setup.
+The system PATH is unchanged. Uninstall removes this installation's own application, runtime, model and registered downloads. Original photographs, exported images and unknown files are kept.
+Running GUI, AI assistant or background jobs prevent uninstall. If removal fails, the uninstall entry stays available so you can retry.
+Shared components or old components with no ownership record are kept and reported. Job cache files and preferences are kept by default; safe cleanup is optional during uninstall.
+On first launch you may connect an AI assistant through MCP or skip that step. Installation does not enable star removal or trail preservation automatically.
+Aester is free software: the processing engine is under Apache-2.0 and the desktop application under GPL-3.0-or-later; both ship with their source, and the licence texts are in versions\<version>\ in the installation folder.

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.cache/
+build/
+dist/
+
+# Local work: jobs, outputs, downloaded tools and private photographs never enter the repository
+/outputs/
+/data/
+/tools/
+/raw*/
+*.log
+
+# Large image and archive files (test images are generated synthetically)
+*.tif
+*.tiff
+*.fit
+*.fits
+*.dng
+*.nef
+*.cr3
+*.arw
+*.zip
+
+# Editors and operating systems
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store
