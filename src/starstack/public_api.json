@@ -1,6 +1,9 @@
 {
  "api_version": 1,
  "modules": {
+  "__init__": {
+   "PRODUCT_VERSION": "constant:str"
+  },
   "background_job": {
    "render_background": "(job_dir, mask_path=None, recipe_path=None, *, mode=None, strength=None, red_gain=None, blue_gain=None)"
   },

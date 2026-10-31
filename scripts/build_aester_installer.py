@@ -59,6 +59,20 @@ def _smoke_desktop(python, application_src):
                    capture_output=True, text=True, check=True, timeout=300)
 
 
+def starstack_version():
+    """The product version (src/starstack/__init__.py), read as text so a snapshot without the engine still builds."""
+    path = ROOT / "src/starstack/__init__.py"
+    text = path.read_text(encoding="utf-8") if path.is_file() else ""
+    match = re.search(r'^__version__ = "([^"]+)"', text, re.M)
+    return match.group(1) if match else "dev"
+
+
+def _numeric_version(product):
+    """Windows wants a numeric AppVersion: the release part of a PEP 440 version (1.0.0rc1 -> 1.0.0)."""
+    match = re.match(r"(\d+)\.(\d+)\.(\d+)", product)
+    return ".".join(match.groups()) if match else "0.0.0"
+
+
 def _source_commit(root):
     try:
         return subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, capture_output=True, text=True,
@@ -234,7 +248,8 @@ def build(output, compiler, model=None, seed_cache=None, *, app_identity=None, n
     build_inputs["build/channel"] = channel
     version = hashlib.sha256(json.dumps({"files": hashes, "build_inputs": build_inputs}, sort_keys=True).encode()).hexdigest()[:12]
     variant = ('-' + app_identity[:8] if app_identity else '') + ('-noshell' if no_icons else '')
-    exe = output / f"Aester-P2-{version}{variant}-Setup.exe"
+    product = starstack_version()
+    exe = output / f"Aester-{product}-{version}{variant}-Setup.exe"
     published = output / (exe.stem + ".json")
     if exe.exists():
         if not published.is_file():
@@ -340,7 +355,7 @@ def build(output, compiler, model=None, seed_cache=None, *, app_identity=None, n
              "/reference:System.Web.Extensions.dll", "/reference:System.Windows.Forms.dll", f"/win32icon:{stage / 'Aester.ico'}",
              f"/out:{stage / name}", *extra, str(ROOT / "packaging/aester_p2/Launcher.cs")], check=True)
     (stage / "INSTALL-NOTES.txt").write_text(
-        "Aester P2 Preview\n\n安装时下载固定版本基础组件约290 MB。\n"
+        f"Aester {product}\n\n安装时下载固定版本基础组件约290 MB。\n"
         "安装器先测速，从官方服务器或所列镜像中较快的一处下载；每个文件都按固定的大小与 SHA-256 校验。\n"
         "安装包不包含 nox 模型。首次启动可自愿安装第三方 nox：约218 MB模型和15 MB运行库，下载地址须已配置。\n"
         "也可稍后在组件管理安装或选择已有兼容模型。模型结果是算法估计，不保证深空无星层质量。\n\n"
@@ -357,6 +372,7 @@ def build(output, compiler, model=None, seed_cache=None, *, app_identity=None, n
         "Aester 是自由软件：处理引擎按 Apache-2.0、桌面程序按 GPL-3.0-or-later 授权，均附源码；许可证文本在安装目录 versions\\<版本>\\ 下。\n",
         encoding="utf-8-sig")
     english_notes = (ROOT / 'packaging/aester_p2/INSTALL-NOTES-en.txt').read_text(encoding='utf-8')
+    english_notes = english_notes.replace('{{PRODUCT_VERSION}}', product)
     english_notes = english_notes.replace('{{FINITE_COMPONENT_NOTE}}',
         ('The optional Siril - Aester improved build includes its runtime, licenses and corresponding source. '
          'Selecting it requires no separate file selection or additional download. It preserves valid zero, negative and '
@@ -376,6 +392,7 @@ def build(output, compiler, model=None, seed_cache=None, *, app_identity=None, n
     app_mb = sum(path.stat().st_size for folder in (app, support) for path in folder.rglob('*') if path.is_file()) / 1048576
     app_mb += sum((stage / name).stat().st_size for name in ('Aester.exe', 'Aester-MCP.exe', 'Aester.ico')) / 1048576
     command = [str(compiler), "/Qp", f"/DStagePath={stage}", f"/DVersionId={version}", f"/DBuildOutput={output}",
+               f"/DProductVersion={product}", f"/DAppVersionNumber={_numeric_version(product)}",
                f"/DInstallerName={exe.stem}", f"/DAppMB={max(1, round(app_mb))}"]
     if app_identity: command.append('/DAppIdentity=' + app_identity)
     if no_icons: command.append('/DNoIcons=1')
@@ -387,7 +404,7 @@ def build(output, compiler, model=None, seed_cache=None, *, app_identity=None, n
     if completed.returncode:
         raise RuntimeError(completed.stdout + completed.stderr)
     receipt = {"installer": str(exe), "bytes": exe.stat().st_size, "sha256": components._digest(exe),
-               "version_id": version, "stage": str(stage), "source_files": len(hashes), "signature": "unsigned",
+               "version_id": version, "product_version": product, "stage": str(stage), "source_files": len(hashes), "signature": "unsigned",
                "compiler": str(Path(compiler).resolve()), "compiler_sha256": components._digest(Path(compiler)),
                "model_sha256": None, "nox_model_bundled": False,
                "network_required_during_install": True, "network_required_after_install": False,

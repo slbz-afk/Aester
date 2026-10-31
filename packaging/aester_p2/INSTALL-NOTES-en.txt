@@ -1,4 +1,4 @@
-Aester P2 Preview
+Aester {{PRODUCT_VERSION}}
 
 The installer downloads about 290 MB of core components.
 Setup first times the official servers and the listed mirrors, then downloads from the fastest; every file is checked against its pinned size and SHA-256.

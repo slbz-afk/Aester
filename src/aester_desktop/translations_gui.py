@@ -735,4 +735,5 @@ EN.update({
     'Aester 名称与图标不在许可范围内；修改后再发布的版本须改用其他名称和图标。':
         'The name Aester and its icon are not licensed; modified versions must use a different name and icon.',
     '许可与源码': 'Licences and source',
+    '版本 {0}': 'Version {0}',
 })
