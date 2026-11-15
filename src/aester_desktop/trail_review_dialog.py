@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import copy
+import functools
 import math
 import re
 from pathlib import Path
@@ -20,12 +21,12 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushB
 from starstack import overlay_colors as oc
 from . import themes
 from starstack import trail_review_session as service
-from starstack.i18n import tr, translate_message
+from starstack.i18n import get_language, tr, translate_message
 from .region_canvas import NightFrameCache, cased, is_night, night_display, red_only, shown_color
 from .ui_widgets import ErrorIcon, PROVENANCE_KINDS, ProvenanceDot
 
 LABELS = {"meteor": "流星", "satellite": "卫星", "aircraft": "飞机", "artifact": "伪影", "unknown": "未知"}
-ACTIONS = {"keep": "保留", "omit": "省略"}
+ACTIONS = {"keep": "保留", "omit": "不加回"}
 # Contract D (2026-09-27): trustworthy meteors are kept by default by the algorithm.
 METEOR_DEFAULT_POLICY = "meteor-default-keep-1"
 # Measurement quality flags that make a meteor's automatic keep untrustworthy.
@@ -167,12 +168,12 @@ def disposition_text(state, meteor_default) -> str:
     if state["explicit"]:
         if state["requested"] and not state["measured"]:
             return '明确保留（未测量，不会加回）'
-        return '明确保留' if state["requested"] else '明确省略'
+        return '明确保留' if state["requested"] else '明确不加回'
     if state["keep"]:
         return '默认保留（算法）' if state["keep_source"] == "algorithm" else '默认保留（按改判身份）'
     if meteor_default and state["identity"] == "meteor":
-        return '默认省略（测量不可靠）'
-    return '默认省略'
+        return '默认不加回（测量不可靠）'
+    return '默认不加回'
 
 
 def _source_text(kind):
@@ -207,6 +208,42 @@ def capture_clock(date_obs) -> str:
     text = str(date_obs or "")
     match = re.search(r"T(\d{1,2}:\d{2}(?::\d{2})?)", text)
     return match.group(1) if match else text
+
+
+@functools.lru_cache(maxsize=1)
+def _zh_patterns():
+    from .translations_dialogs import ZH_SUGGESTION_REASONS
+    return tuple((re.compile(pattern), template) for pattern, template in ZH_SUGGESTION_REASONS)
+
+
+def _zh_value(name, value):
+    from . import translations_dialogs as zh
+    if value is None:
+        return ""
+    if name.endswith("_level"):
+        return zh.ZH_REASON_LEVEL.replace("{value}", value)
+    if name in ("frame", "frames") and value not in zh.ZH_REASON_VALUES:
+        frame = lambda match: zh.ZH_REASON_FRAME.replace("{number}", str(int(match.group(1))))
+        return zh.ZH_REASON_LIST_SEPARATOR.join(re.sub(r"light_(\d+)", frame, part.strip()) for part in value.split(","))
+    return zh.ZH_REASON_VALUES.get(value, value)
+
+
+def suggestion_text(reason) -> str:
+    """One of the scan's English suggestion reasons, in Chinese for the Chinese interface (display only).
+
+    The record keeps the English text; an unknown or older wording is shown as it is.
+    """
+    text = str(reason)
+    if get_language() == "en":
+        return text
+    for pattern, template in _zh_patterns():
+        match = pattern.fullmatch(text)
+        if match:
+            shown = template
+            for name, value in match.groupdict().items():
+                shown = shown.replace("{" + name + "}", _zh_value(name, value))
+            return shown
+    return text
 
 
 def _sort_keys(candidate):
@@ -913,9 +950,9 @@ class TrailReviewDialog(QDialog):
         self._fit_to_screen(parent)
         layout = QVBoxLayout(self)
         if self._meteor_default():
-            text = tr('选中一条或多条亮迹，分别决定身份与是否保留。测量可靠的流星默认保留（空心圈＝算法）；其他身份默认省略，明确选择“保留”才会加回。改判后列表与右侧预览立即更新，朱点表示你的改判。\n未知不等于卫星；自动省略不代表已排除流星。先保存草稿，最后一次应用全部选择；保留限于已测量范围。')
+            text = tr('选中一条或多条亮迹，分别决定身份与是否保留。测量可靠的流星默认保留（空心圈＝算法）；其他身份默认不加回，明确选择“保留”才会加回。改判后列表与右侧预览立即更新，朱点表示你的改判。\n未知不等于卫星；自动不加回不代表已排除流星。先保存草稿，最后一次应用全部选择；保留限于已测量范围。')
         else:
-            text = tr('选中一条或多条亮迹，分别决定身份与是否保留。只有明确选择“保留”才会加回，判断为流星也不会自动加回。\n未知不等于卫星；自动省略不代表已排除流星。先保存草稿，最后一次应用全部选择；保留限于已测量范围。')
+            text = tr('选中一条或多条亮迹，分别决定身份与是否保留。只有明确选择“保留”才会加回，判断为流星也不会自动加回。\n未知不等于卫星；自动不加回不代表已排除流星。先保存草稿，最后一次应用全部选择；保留限于已测量范围。')
         intro = QLabel(text)
         intro.setWordWrap(True)
         themes.set_role(intro, 'muted')
@@ -924,7 +961,7 @@ class TrailReviewDialog(QDialog):
         layout.addLayout(self._build_filters())
         self.split = split = QSplitter(Qt.Orientation.Horizontal)
         self.list = _CandidateTree()
-        self.list.setHeaderLabels([tr('候选 / 曝光'), tr('身份'), tr('处置状态'), tr('本次选择'),
+        self.list.setHeaderLabels([tr('候选 / 曝光'), tr('身份'), tr('是否加回'), tr('本次选择'),
                                    tr('优先级'), tr('时间'), tr('亮度'), tr('长度')])
         header_tips = {COL_ID: tr('点击按拍摄顺序排列。'),
                        COL_PRIORITY: tr('先看哪些的提示，不是可信度。自动不加回的候选里，端点渐隐、碰到画框边或测量到边界的为“高”。已加回或已有明确选择的显示“—”。'),
@@ -951,7 +988,7 @@ class TrailReviewDialog(QDialog):
                         order, _sort_keys(candidate))
             item.setData(0, Qt.ItemDataRole.UserRole, candidate["id"])
             item.setToolTip(0, candidate["id"] + "\n" + str(candidate.get("input") or "") +
-                            (tr('\n未能测量定位，不能把省略视为已排除流星') if candidate.get("status") != "measured" else ""))
+                            (tr('\n未能测量定位，不能把“不加回”视为已排除流星') if candidate.get("status") != "measured" else ""))
             if candidate.get("date_obs"):
                 item.setToolTip(COL_TIME, tr('{0}（相机时间，时区未知）', candidate["date_obs"]))
             for column in (COL_SNR, COL_LENGTH):
@@ -980,13 +1017,13 @@ class TrailReviewDialog(QDialog):
             self.label_choice.addItem(tr(text), value)
         self.label_choice.addItem(tr('清除已有人工身份'), None)
         self.action_choice = QComboBox()
-        reset = tr('恢复默认（按身份）') if self._meteor_default() else tr('恢复默认省略')
-        for text, value in ((tr('处置：保持原样'), "unchanged"), (tr('保留'), "keep"), (tr('省略'), "omit"), (reset, None)):
+        reset = tr('恢复默认（按身份）') if self._meteor_default() else tr('恢复默认（不加回）')
+        for text, value in ((tr('是否加回：保持原样'), "unchanged"), (tr('保留'), "keep"), (tr('不加回'), "omit"), (reset, None)):
             self.action_choice.addItem(text, value)
         controls.addWidget(self.label_choice)
         controls.addWidget(self.action_choice)
         self.label_choice.setAccessibleName(tr('身份'))
-        self.action_choice.setAccessibleName(tr('处置'))
+        self.action_choice.setAccessibleName(tr('是否加回'))
         self.batch_button = _button(tr('设置选中项'))
         self.batch_button.clicked.connect(self.set_selected_decisions)
         controls.addWidget(self.batch_button)
@@ -1124,7 +1161,7 @@ class TrailReviewDialog(QDialog):
         revised_layout.setContentsMargins(2, 2, 2, 2)
         self.revised_button = _button("", 'segment')
         self.revised_button.setCheckable(True)
-        self.revised_button.setToolTip(tr('只显示身份或处置由人工或 Agent 改判过的候选。'))
+        self.revised_button.setToolTip(tr('只显示身份或是否加回由人工或 Agent 改判过的候选。'))
         self.revised_button.toggled.connect(self.set_revised_filter)
         revised_layout.addWidget(self.revised_button)
         row.addWidget(revised)
@@ -1262,6 +1299,11 @@ class TrailReviewDialog(QDialog):
         self.summary = QLabel(tr('选择候选查看来源与邻帧。'))
         self.summary.setWordWrap(True)
         column.addWidget(self.summary)
+        # Why the scan suggested this identity (its own words, in Chinese for the Chinese interface).
+        self.reasons = QLabel("")
+        self.reasons.setWordWrap(True)
+        themes.set_role(self.reasons, 'hint')
+        column.addWidget(self.reasons)
         column.addWidget(self._build_revision())
         column.addSpacing(6)
         # The real neighbouring exposures side by side, so a trail that continues is seen at a glance.
@@ -1334,7 +1376,7 @@ class TrailReviewDialog(QDialog):
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(2)
         self.revision_rows = {}
-        for row, (key, title) in enumerate((("label", tr('身份')), ("override", tr('处置')))):
+        for row, (key, title) in enumerate((("label", tr('身份')), ("override", tr('是否加回')))):
             caption = QLabel(title)
             themes.set_role(caption, 'muted')
             old = StruckLabel()
@@ -1422,7 +1464,7 @@ class TrailReviewDialog(QDialog):
             elif self._meteor_default():
                 new = tr(disposition_text(self.candidate_state(candidate_id), True))
             else:
-                new = tr('默认省略')
+                new = tr('默认不加回')
             values["override"] = (self._recorded_disposition(candidate), new)
         for key, (caption, old, arrow, new) in self.revision_rows.items():
             shown = key in values
@@ -1695,17 +1737,17 @@ class TrailReviewDialog(QDialog):
             reasons = [str(r) for r in ((candidate.get("suggestion") or {}).get("reasons") or [])[:3]]
             item.setToolTip(1, tr('身份：{0} · 来源：{1}', identity, _source_text(state["identity_source"])) + "\n" +
                             tr('算法建议：{0}', tr(LABELS[state["suggestion"]])) +
-                            "".join("\n· " + reason for reason in reasons))
+                            "".join("\n· " + suggestion_text(reason) for reason in reasons))
             disposition = self._disposition(candidate, state)
             item.setText(2, disposition)
             item.setData(2, DOT_ROLE, state["keep_source"])
-            item.setToolTip(2, tr('处置：{0} · 来源：{1}', disposition, _source_text(state["keep_source"])) + policy_note)
+            item.setToolTip(2, tr('是否加回：{0} · 来源：{1}', disposition, _source_text(state["keep_source"])) + policy_note)
             decision = self.decisions.get(cid, {})
             parts = []
             if "label" in decision:
                 parts.append(tr(LABELS.get(decision["label"], '清除身份')))
             if "override" in decision:
-                reset = tr('恢复默认') if meteor_default else tr('默认省略')
+                reset = tr('恢复默认') if meteor_default else tr('默认不加回')
                 parts.append(tr(ACTIONS[decision["override"]]) if decision["override"] in ACTIONS else reset)
             item.setText(3, " / ".join(parts))
         self.location.set_styles(styles)
@@ -1735,7 +1777,7 @@ class TrailReviewDialog(QDialog):
         items = [item for item in self.list.selectedItems() if not item.isHidden()]
         label, action = self.label_choice.currentData(), self.action_choice.currentData()
         if not items or (label == action == "unchanged"):
-            self.status.setText(tr('先选择候选和要更改的身份或处置。'))
+            self.status.setText(tr('先选择候选和要更改的身份或是否加回。'))
             return
         self._choose([item.data(0, Qt.ItemDataRole.UserRole) for item in items], label, action)
 
@@ -1875,11 +1917,14 @@ class TrailReviewDialog(QDialog):
         candidate = self._candidate(cid)
         review = candidate.get("recall_review") or {}
         # The file name only: a full path does not wrap in the side panel (it stays in the tooltip).
-        self.summary.setText(tr("{0} · {1}\n已记录身份：{2}；复核处置：{3}。 ",
+        self.summary.setText(tr("{0} · {1}\n已记录身份：{2}；是否加回：{3}。 ",
                              cid, _file_name(candidate.get('input')),
                              tr(LABELS[self._recorded_identity(candidate)]),
                              self._recorded_disposition(candidate)) + translate_message(review.get("message") or ""))
         self.summary.setToolTip(str(candidate.get('input') or ''))
+        reasons = [suggestion_text(r) for r in ((candidate.get("suggestion") or {}).get("reasons") or [])]
+        self.reasons.setText(tr('算法建议：{0}', tr(LABELS[suggested_identity(candidate)])) +
+                             "".join("\n· " + reason for reason in reasons))
         self._show_thumbnail(candidate)
         self._context_token += 1
         self._context_pending = (self._context_token, cid)

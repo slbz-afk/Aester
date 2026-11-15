@@ -414,3 +414,50 @@ def test_bulk_confirmation_defaults_to_cancel(make, session, monkeypatch, app):
     assert not view.bulk_choice("keep")
     assert seen and seen[0][0] == "取消" and "全部保留" in seen[0][1] and "飞机或卫星" in seen[0][2]
     assert view.decisions == {}
+
+
+# ---- the scan's suggestion reasons in Chinese --------------------------------------------------
+
+REASONS = [
+    ("geometrically compatible segment in adjacent frame light_00044 (angle 0.6°, lateral 0.8 px, gap 113 px); "
+     "same-object identity unverified",
+     "相邻曝光第44张里有一段方向和位置都接得上（夹角 0.6°，横向偏 0.8 像素，相隔 113 像素）；是否同一物体未核实"),
+    ("light curve: start faded (0.20 of the peak), stop between (0.38 of the peak)",
+     "亮度变化：起点渐隐（峰值的 0.20），终点介于渐隐和中断之间（峰值的 0.38）"),
+    ("light curve: start unjudged, stop unjudged", "亮度变化：起点无法判断，终点无法判断"),
+    ("single frame candidate; no compatible continuation was linked in the scanned adjacent-frame catalog "
+     "(light_00002, light_00004); original-exposure absence is not established; no periodic modulation, total S/N 60.7",
+     "只在本张出现：已扫描的相邻曝光（第2张、第4张）里没有接得上的一段，但不能断定原片里没有；没有周期性明暗，总信噪比 60.7"),
+    ("single frame candidate; no compatible continuation was linked in the scanned adjacent-frame catalog "
+     "(none available); original-exposure absence is not established; no periodic modulation, total S/N 9.0",
+     "只在本张出现：已扫描的相邻曝光（无）里没有接得上的一段，但不能断定原片里没有；没有周期性明暗，总信噪比 9.0"),
+    ("same place in 3 frames: light_00063, light_00070, light_00090", "在 3 张曝光的同一位置都有：第63张、第70张、第90张"),
+    ("not measured (too_short)", "未能测量（太短）"),
+    ("total S/N 6.2 below 8", "总信噪比 6.2，低于 8，太弱，不判断身份"),
+]
+
+
+@pytest.mark.parametrize("english,expected", REASONS)
+def test_suggestion_reasons_are_shown_in_chinese_and_kept_in_english(english, expected):
+    assert i18n.get_language() == "zh_CN"
+    assert dialog_module.suggestion_text(english) == expected
+    i18n.set_language("en")
+    assert dialog_module.suggestion_text(english) == english
+
+
+def test_unknown_reason_wording_is_shown_as_written_and_the_tooltip_uses_chinese(make, session):
+    assert dialog_module.suggestion_text("a future reason (x 1)") == "a future reason (x 1)"
+    session["candidates"][1]["suggestion"]["reasons"] = [REASONS[0][0], "a future reason"]
+    view = make(session)
+    tip = view._items["light_00002-1"].toolTip(1)
+    assert REASONS[0][1] in tip and "a future reason" in tip and "geometrically" not in tip
+    view.select_candidate("light_00002-1")           # the side panel lists the same reasons
+    assert view.reasons.text().startswith("算法建议：未知") and REASONS[0][1] in view.reasons.text()
+    assert session["candidates"][1]["suggestion"]["reasons"][0] == REASONS[0][0]      # the record is unchanged
+
+
+def test_plain_words_for_omit_in_the_dialog(make, session):
+    view = make(session)
+    assert view._items["light_00001-1"].text(2) == "默认不加回"
+    assert view.action_choice.itemText(view.action_choice.findData("omit")) == "不加回"
+    assert view.list.headerItem().text(2) == "是否加回"

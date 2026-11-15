@@ -143,7 +143,7 @@ def test_agent_draft_identity_shows_xiang_and_becomes_human_when_changed(app, ma
     assert item.text(1) == '卫星' and item.data(1, DOT_ROLE) == 'agent'
     _relabel(view, 'trail-2', 'unchanged', 'omit')
     assert item.data(1, DOT_ROLE) == 'agent'           # the label is still the Agent's
-    assert item.data(2, DOT_ROLE) == 'human' and item.text(2) == '明确省略'
+    assert item.data(2, DOT_ROLE) == 'human' and item.text(2) == '明确不加回'
     _relabel(view, 'trail-2', 'aircraft')
     assert item.text(1) == '飞机' and item.data(1, DOT_ROLE) == 'human'
 
@@ -152,12 +152,12 @@ def test_meteor_default_keep_is_shown_and_follows_identity(app, make, policy_ses
     view = make(policy_session)
     first, second = view._items['trail-1'], view._items['trail-2']
     assert first.text(2) == '默认保留（算法）' and first.data(2, DOT_ROLE) == 'algorithm'
-    assert second.text(2) == '默认省略' and second.data(2, DOT_ROLE) == 'algorithm'
+    assert second.text(2) == '默认不加回' and second.data(2, DOT_ROLE) == 'algorithm'
     assert view.location.styles == {'trail-1': ('meteor', True), 'trail-2': ('unknown', False)}
     assert '默认保留' in view.findChildren(trd.QLabel)[0].text()
     assert view.action_choice.itemText(view.action_choice.count() - 1) == '恢复默认（按身份）'
     _relabel(view, 'trail-1', 'satellite')                  # relabelling drops the default keep
-    assert first.text(2) == '默认省略' and view.location.styles['trail-1'] == ('satellite', False)
+    assert first.text(2) == '默认不加回' and view.location.styles['trail-1'] == ('satellite', False)
     assert first.data(2, DOT_ROLE) == 'human'               # the omission follows your identity
     _relabel(view, 'trail-2', 'meteor')                     # relabelling as meteor adds it
     assert second.text(2) == '默认保留（按改判身份）' and second.data(2, DOT_ROLE) == 'human'
@@ -165,7 +165,7 @@ def test_meteor_default_keep_is_shown_and_follows_identity(app, make, policy_ses
     _relabel(view, 'trail-1', 'unchanged', 'keep')          # an explicit keep wins
     assert first.text(2) == '明确保留' and first.data(2, DOT_ROLE) == 'human'
     _relabel(view, 'trail-1', 'unchanged', None)            # reset: the default for a satellite
-    assert first.text(2) == '默认省略' and view.location.styles['trail-1'] == ('satellite', False)
+    assert first.text(2) == '默认不加回' and view.location.styles['trail-1'] == ('satellite', False)
     assert view.decisions['trail-1'] == {'label': 'satellite', 'override': None}
     _relabel(view, 'trail-1', None)                          # clearing the label: the suggestion again
     assert first.text(1) == '流星' and first.data(1, DOT_ROLE) == 'algorithm'
@@ -180,7 +180,7 @@ def test_untrustworthy_meteor_is_omitted_by_default_without_backend_fields(app, 
     value['candidates'][1].update(suggestion={'class': 'meteor'}, effective_label='meteor', status='measured',
                                   measurement_quality={})
     view = make(value)
-    assert view._items['trail-1'].text(2) == '默认省略（测量不可靠）'
+    assert view._items['trail-1'].text(2) == '默认不加回（测量不可靠）'
     assert view._items['trail-2'].text(2) == '默认保留（算法）'
     assert view.location.styles == {'trail-1': ('meteor', False), 'trail-2': ('meteor', True)}
 
@@ -270,7 +270,7 @@ def test_real_review_view_layers_saved_drafts_and_round_trips_the_option(app, ma
     caption, old, arrow, new = view.revision_rows['label']
     assert old.text() == '未知' and new.text() == '流星' and view.revision_dot.kind() == 'agent'
     view.clear_selected_decisions()
-    assert item.text(1) == '未知' and item.data(1, DOT_ROLE) == 'algorithm' and item.text(2) == '默认省略'
+    assert item.text(1) == '未知' and item.data(1, DOT_ROLE) == 'algorithm' and item.text(2) == '默认不加回'
     view.undo()
     view.export_layer.setChecked(True)
     assert view.save()

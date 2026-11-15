@@ -223,3 +223,71 @@ EN.update({
     '把当前筛选的 {0} 条全部设为不加回？\n“撤销上一步”可恢复。':
         'Add none of the {0} candidates in this filter back?\nUndo last change restores them.',
 })
+
+# Plainer review wording (2026-11): 不加回 for 省略, 是否加回 for 处置; the English is unchanged.
+EN.update({
+    '选中一条或多条亮迹，分别决定身份与是否保留。测量可靠的流星默认保留（空心圈＝算法）；其他身份默认不加回，明确选择“保留”才会加回。改判后列表与右侧预览立即更新，朱点表示你的改判。\n未知不等于卫星；自动不加回不代表已排除流星。先保存草稿，最后一次应用全部选择；保留限于已测量范围。':
+        'Select trails and choose identity and keep/omit decisions separately. Meteors with a reliable measurement are kept by default (hollow ring = algorithm); other identities are omitted unless you choose Keep. The list and the preview update as soon as you revise a trail; a red dot marks your revision.\nUnknown does not mean satellite, and automatic omission does not rule out a meteor. Save a draft, then apply all choices. Preservation covers only the measured extent.',
+    '选中一条或多条亮迹，分别决定身份与是否保留。只有明确选择“保留”才会加回，判断为流星也不会自动加回。\n未知不等于卫星；自动不加回不代表已排除流星。先保存草稿，最后一次应用全部选择；保留限于已测量范围。':
+        'Select trails and choose identity and keep/omit decisions separately. Only Keep adds a trail back; a Meteor label alone does not.\nUnknown does not mean satellite, and automatic omission does not rule out a meteor. Save a draft, then apply all choices. Preservation covers only the measured extent.',
+    '\n未能测量定位，不能把“不加回”视为已排除流星':
+        '\nPosition could not be measured. Omission does not rule out a meteor.',
+    '恢复默认（不加回）':
+        'Reset to default omission',
+    '是否加回：保持原样':
+        'Decision: unchanged',
+    '是否加回':
+        'Decision',
+    '只显示身份或是否加回由人工或 Agent 改判过的候选。':
+        'Show only candidates whose identity or decision was revised by you or an Agent.',
+    '先选择候选和要更改的身份或是否加回。':
+        'Select candidates, then choose an identity or a keep/omit decision.',
+    '是否加回：{0} · 来源：{1}':
+        'Decision: {0} · Source: {1}',
+    '{0} · {1}\n已记录身份：{2}；是否加回：{3}。 ':
+        '{0} · {1}\nRecorded identity: {2}; review decision: {3}. ',
+    '默认不加回（测量不可靠）':
+        'Omit by default (measurement unreliable)',
+    '明确不加回':
+        'Explicitly omit',
+    '默认不加回':
+        'Omit by default',
+})
+
+# The trail scan writes its suggestion reasons in English (transient_trails.suggest). The Chinese interface
+# shows them in Chinese through these display-only patterns: (regular expression, Chinese template). A
+# reason that matches none is shown as written; the English interface always shows the original.
+ZH_SUGGESTION_REASONS = (
+    (r"not measured \((?P<status>[^)]*)\)", "未能测量（{status}）"),
+    (r"same place in (?P<count>\d+) frames: (?P<frames>.*)", "在 {count} 张曝光的同一位置都有：{frames}"),
+    (r"periodic brightness modulation along the trail \(period (?P<period>[^ ]+) px, "
+     r"autocorrelation (?P<correlation>[^,]+), dark fraction (?P<dark>[^)]+)\)",
+     "沿轨迹亮度周期性明暗（周期 {period} 像素，自相关 {correlation}，暗段占 {dark}）"),
+    (r"geometrically compatible segment in adjacent frame (?P<frame>\S+) \(angle (?P<angle>[^°]+)°, "
+     r"lateral (?P<lateral>\S+) px, gap (?P<gap>\S+) px\); same-object identity unverified",
+     "相邻曝光{frame}里有一段方向和位置都接得上（夹角 {angle}°，横向偏 {lateral} 像素，相隔 {gap} 像素）；是否同一物体未核实"),
+    (r"total S/N (?P<snr>\S+) below (?P<weak>\S+)", "总信噪比 {snr}，低于 {weak}，太弱，不判断身份"),
+    (r"single frame candidate; no compatible continuation was linked in the scanned adjacent-frame catalog "
+     r"\((?P<frames>.*)\); original-exposure absence is not established; no periodic modulation, "
+     r"total S/N (?P<snr>\S+)",
+     "只在本张出现：已扫描的相邻曝光（{frames}）里没有接得上的一段，但不能断定原片里没有；没有周期性明暗，总信噪比 {snr}"),
+    (r"light curve: start (?P<start>\w+)(?: \((?P<start_level>[\d.]+) of the peak\))?, "
+     r"stop (?P<stop>\w+)(?: \((?P<stop_level>[\d.]+) of the peak\))?",
+     "亮度变化：起点{start}{start_level}，终点{stop}{stop_level}"),
+    (r"both measured ends fade inside the frame; supports a meteor suggestion, not physical identity certification",
+     "两端都在画面内渐隐：支持“流星”的建议，但不是身份认证"),
+    (r"both measured ends stop abruptly near full brightness; compatible with a shutter-limited trail, "
+     r"not physical identity certification",
+     "两端都在接近最亮处突然中断：与被快门截断的轨迹相符（常见于卫星），但不是身份认证"),
+    (r"the ends do not decide identity; an abrupt or unjudged end does not exclude a meteor "
+     r"\(unjudged: too faint, no data beyond, or at the frame border\)",
+     "两端不能决定身份：一端突然中断或无法判断，都不排除流星（无法判断：太暗、外侧没有数据或碰到画框边）"),
+)
+# Values inside those reasons, and how levels and frame names are shown.
+ZH_REASON_VALUES = {
+    "faded": "渐隐", "abrupt": "突然中断", "between": "介于渐隐和中断之间", "unjudged": "无法判断",
+    "too_short": "太短", "no_signal": "没有足够信号", "none available": "无",
+}
+ZH_REASON_LEVEL = "（峰值的 {value}）"
+ZH_REASON_FRAME = "第{number}张"
+ZH_REASON_LIST_SEPARATOR = "、"
