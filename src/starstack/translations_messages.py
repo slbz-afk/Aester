@@ -935,6 +935,8 @@ EN_EXACT: dict[str, str] = {
     '默认保留（流星）': 'Kept by default (meteor)',
     '流星量测不可靠，默认不加回': 'Meteor measurement is unreliable; not added back by default',
     '旧候选缩略图没有内容校验；请使用下方经过校验的实际曝光对照': 'The old candidate thumbnail has no content verification; use the verified actual exposures below for comparison.',
+    '候选缩略图缺失；请使用下方经过校验的实际曝光对照': 'The candidate thumbnail is missing; use the verified actual exposures below for comparison.',
+    '扫描缩略图未经内容校验，仅供浏览；判断请以下方经过校验的实际曝光对照为准': 'The scan thumbnail has no content verification and is for browsing only; judge from the verified actual exposures below.',
     '实际配准曝光': 'Actual aligned exposures',
     '基础成片不自动加入未复核亮迹；堆栈仍可能残留亮迹。': 'The base photograph does not add unreviewed trails automatically; trails may still remain in the stack.',
     '模型分层为实验能力，可重合成不代表无星摄影质量通过。': 'Model-based layering is experimental; being able to recomposite does not mean the starless result passed photographic review.',

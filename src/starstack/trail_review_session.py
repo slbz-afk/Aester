@@ -246,6 +246,25 @@ def _disposition(candidate, meteor):
     return "建议保留（未采用）" if candidate.get("decision") == "keep" else "默认省略"
 
 
+def _unverified_thumbnail(path, directory):
+    """(review_png, preview_note) for a scan thumbnail without a recorded content hash.
+
+    The scan never records review_png_sha256, so this covers every scan thumbnail. View
+    only: the record and the files are not changed. The thumbnail is shown, marked as
+    unverified, only from this job's own work/transients/crops folder and only when the
+    file is there; any other place in the job folder stays hidden as before (a place
+    outside the job folder is refused by the caller's _within).
+    """
+    from .transient_stage import TRANSIENTS_DIR
+    try:
+        path = _within(path, directory / "work" / TRANSIENTS_DIR / "crops")
+    except ValueError:
+        return None, "旧候选缩略图没有内容校验；请使用下方经过校验的实际曝光对照"
+    if not path.is_file():
+        return None, "候选缩略图缺失；请使用下方经过校验的实际曝光对照"
+    return str(path), "扫描缩略图未经内容校验，仅供浏览；判断请以下方经过校验的实际曝光对照为准"
+
+
 def _view(value, job, record):
     from .transient_review import candidate_view
     from .transient_stage import keep_view
@@ -275,8 +294,7 @@ def _view(value, job, record):
                 _verify_file(path, expected, "候选缩略图")
                 view["review_png"] = str(path)
             else:
-                view["review_png"] = None
-                view["preview_note"] = "旧候选缩略图没有内容校验；请使用下方经过校验的实际曝光对照"
+                view["review_png"], view["preview_note"] = _unverified_thumbnail(path, directory)
         result["candidates"].append(view)
     result["preview_path"] = None
     photo = ((job.get("diagnostics") or {}).get("color_export") or {}).get("photo") or {}

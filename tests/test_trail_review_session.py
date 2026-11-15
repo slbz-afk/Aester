@@ -526,3 +526,104 @@ def test_meteor_workflow_session_and_trails_preview(job_directory):
     assert session["base_preview_path"] == str((works / "base" / "final.jpg").resolve())
     (works / "trails" / "final.jpg").write_bytes(b"changed after publication")
     assert review.read_review(session["session_path"])["preview_path"] != str((works / "trails" / "final.jpg").resolve())
+
+
+# ---- B5 (2026-11-16): scan thumbnails in the review view. The scan writes review_png but never
+# review_png_sha256, so the view shows the job's own work/transients/crops file, marked unverified.
+UNVERIFIED_NOTE = "扫描缩略图未经内容校验，仅供浏览；判断请以下方经过校验的实际曝光对照为准"
+MISSING_NOTE = "候选缩略图缺失；请使用下方经过校验的实际曝光对照"
+LEGACY_NOTE = "旧候选缩略图没有内容校验；请使用下方经过校验的实际曝光对照"
+
+
+def with_thumbnails(directory, paths, hashes=None):
+    """Publish a revision whose candidates carry review_png (as the scan records it: an absolute path,
+    no hash) and, when given, review_png_sha256."""
+    job = json.loads((directory / "job.json").read_text())
+    record = json.loads(Path(job["transient_revision"]["record"]).read_text())
+    for candidate in record["candidates"]:
+        if candidate["id"] in (hashes or {}):
+            candidate["review_png_sha256"] = hashes[candidate["id"]]
+        if candidate["id"] in paths:
+            candidate["review_png"] = str(paths[candidate["id"]])
+    target = directory / "products" / "thumbnails"
+    target.mkdir()
+    revision = prepare(target, record)
+    change_job(directory, lambda value: value.update(transient_revision=revision))
+    return Path(revision["record"])
+
+
+def crop(directory, name, colour=200):
+    from PIL import Image
+    crops = directory / "work" / "transients" / "crops"
+    crops.mkdir(parents=True, exist_ok=True)
+    path = crops / name
+    Image.new("L", (16, 8), colour).save(path)
+    return path
+
+
+def fingerprint(*paths):
+    return {str(path): hashlib.sha256(Path(path).read_bytes()).hexdigest() for path in paths}
+
+
+def test_scan_thumbnail_without_hash_is_shown_and_marked_unverified(job_directory):
+    png = crop(job_directory, "light_00001-1.png")
+    record = with_thumbnails(job_directory, {"light_00001-1": png})
+    before = fingerprint(record, png, job_directory / "job.json")
+    session = review.open_review(str(job_directory))
+    first, second = session["candidates"]
+    assert first["review_png"] == str(png.resolve()) and Path(first["review_png"]).is_file()
+    assert first["preview_note"] == UNVERIFIED_NOTE
+    assert second["review_png"] is None and "preview_note" not in second       # no thumbnail recorded: nothing to say
+    assert review.read_review(session["session_path"])["candidates"][0]["review_png"] == str(png.resolve())
+    assert fingerprint(record, png, job_directory / "job.json") == before          # view only: nothing rewritten
+    from starstack.i18n import translate_message
+    assert translate_message(UNVERIFIED_NOTE, "en").startswith("The scan thumbnail has no content verification")
+    assert translate_message(MISSING_NOTE, "en").startswith("The candidate thumbnail is missing")
+
+
+def test_scan_thumbnail_without_hash_and_missing_file_is_not_shown(job_directory):
+    png = job_directory / "work" / "transients" / "crops" / "light_00001-1.png"   # recorded, never written
+    with_thumbnails(job_directory, {"light_00001-1": png})
+    session = review.open_review(str(job_directory))
+    assert session["candidates"][0]["review_png"] is None
+    assert session["candidates"][0]["preview_note"] == MISSING_NOTE
+    assert not png.parent.exists()                                                 # the view creates nothing
+
+
+def test_unhashed_thumbnail_elsewhere_in_the_job_stays_hidden(job_directory):
+    # A file inside the job but outside work/transients/crops (here: the master, and a crop folder of an
+    # export) is not shown without a hash; the record keeps its path.
+    other = job_directory / "products" / "revision1" / "transients" / "crops" / "light_00002-1.png"
+    other.parent.mkdir(parents=True)
+    other.write_bytes((job_directory / "work" / "sky_master.fit").read_bytes())
+    with_thumbnails(job_directory, {"light_00001-1": job_directory / "work" / "sky_master.fit", "light_00002-1": other})
+    session = review.open_review(str(job_directory))
+    for view in session["candidates"]:
+        assert view["review_png"] is None and view["preview_note"] == LEGACY_NOTE
+
+
+@pytest.mark.parametrize("escape", ["outside", "dotdot"])
+def test_thumbnail_path_outside_the_job_folder_is_refused(job_directory, tmp_path, escape):
+    from PIL import Image
+    outside = tmp_path / "outside.png"
+    Image.new("L", (16, 8), 9).save(outside)
+    path = outside if escape == "outside" else job_directory / "work" / "transients" / "crops" / ".." / ".." / ".." / ".." / "outside.png"
+    assert path.resolve() == outside.resolve()
+    with_thumbnails(job_directory, {"light_00001-1": path})
+    with pytest.raises(ValueError, match="复核文件超出本作业目录"):
+        review.open_review(str(job_directory))
+
+
+def test_thumbnail_with_hash_keeps_the_verified_path(job_directory):
+    png = crop(job_directory, "light_00001-1.png")
+    digest = hashlib.sha256(png.read_bytes()).hexdigest()
+    with_thumbnails(job_directory, {"light_00001-1": png}, {"light_00001-1": digest})
+    session = review.open_review(str(job_directory))
+    assert session["candidates"][0]["review_png"] == str(png.resolve())
+    assert "preview_note" not in session["candidates"][0]                          # verified: no unverified note
+    crop(job_directory, "light_00001-1.png", colour=10)                            # changed after publication
+    with pytest.raises(ValueError, match="候选缩略图缺失、已改变或缺少内容校验"):
+        review.read_review(session["session_path"])
+    png.unlink()
+    with pytest.raises(ValueError, match="候选缩略图缺失、已改变或缺少内容校验"):
+        review.read_review(session["session_path"])
