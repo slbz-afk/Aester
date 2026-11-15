@@ -209,8 +209,8 @@ EN.update({
         'Identities are algorithm suggestions or reviewer choices, not certification; one meteor in one exposure may appear as several candidates.',
     '未扫描的帧（质量门剔除或未能对齐）里即使有流星，也不在本清单中。':
         'Frames that were not scanned (excluded by the quality gate or not aligned) are not covered, even if they hold meteors.',
-    '单张曝光时长不在复核数据里；exposure 只有本段合计。':
-        'Single-exposure times are not in the review data; exposure gives only the segment totals.',
+    'exposure_s 是每行那张曝光的时长（秒，取自转换后帧的 FITS EXPTIME），没有记录时留空；exposure 是本段合计。':
+        'exposure_s is the exposure time of each row’s exposure in seconds (FITS EXPTIME of its converted frame), empty when it was not recorded; exposure gives the segment totals.',
     '若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（这次没有可用的转换记录）。':
         'If camera RAW files were converted to DNG working copies when they were added, the list names the working copies: each original has the same name stem and a different hash (no conversion record from this session was available).',
 })
@@ -256,6 +256,8 @@ EN.update({
         'Decision: {0} · Source: {1}',
     '{0} · {1}\n已记录身份：{2}；是否加回：{3}。 ':
         '{0} · {1}\nRecorded identity: {2}; review decision: {3}. ',
+    '曝光 {0} 秒':
+        'exposure {0} s',
     '默认不加回（测量不可靠）':
         'Omit by default (measurement unreliable)',
     '明确不加回':

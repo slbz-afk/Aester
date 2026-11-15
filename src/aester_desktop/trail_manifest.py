@@ -13,6 +13,9 @@ in UT. For camera RAW, Siril converts the camera's clock time to UT with the pro
 zone, so converting it back with this computer's zone gives the camera clock when the camera, the
 processing computer and this computer use the same zone.
 
+Exposure: ``exposure_s`` is the review view's ``exptime_s``, the converted frame's FITS EXPTIME in seconds
+(empty when it was not recorded); the header keeps the segment totals.
+
 Original files: when Aester converted camera RAW files to DNG working copies, the job stacked the DNGs.
 The main window passes what ``raw_import.prepare_import`` returned in this session (see
 ``import_sources``) so each row can name the original; without it the row names the stacked input.
@@ -31,11 +34,11 @@ from pathlib import Path
 from starstack import PRODUCT_VERSION
 from starstack.i18n import tr
 
-FORMAT = "aester-composite-list-2"
+FORMAT = "aester-composite-list-3"
 KINDS = ("algorithm", "human", "agent")
 CLASSES = ("meteor", "satellite", "aircraft", "artifact", "unknown")
 COLUMNS = ("id", "source_file", "source_sha256", "frame_index", "capture_time_local", "capture_time_utc",
-           "x1", "y1", "x2", "y2", "source_x1", "source_y1", "source_x2", "source_y2",
+           "exposure_s", "x1", "y1", "x2", "y2", "source_x1", "source_y1", "source_x2", "source_y2",
            "identity", "identity_source", "keep_source", "stacked_input", "stacked_input_sha256")
 TIME_BASIS = ("FITS DATE-OBS (UT). For camera RAW, Siril writes it from the camera's clock time using the "
               "processing computer's time zone; capture_time_local converts it back with this computer's time zone.")
@@ -129,6 +132,12 @@ def _number(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         return None
     return value
+
+
+def _seconds(value):
+    """A positive, finite exposure time in seconds, or None."""
+    value = _number(value)
+    return value if value is not None and value > 0 else None
 
 
 def _point_pairs(points):
@@ -246,7 +255,7 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
         original, original_sha, _ = _original(c.get("input"), c.get("input_sha256"), originals)
         utc, local = _times(c.get("date_obs"), zone)
         rows.append(dict(zip(COLUMNS, (
-            cid, original, original_sha, c.get("frame_index"), local, utc,
+            cid, original, original_sha, c.get("frame_index"), local, utc, _seconds(c.get("exptime_s")),
             *image, *source, identity, identity_source, _published_keep_source(c, bool(drafts.get(cid))),
             file_name(c.get("input")), c.get("input_sha256") or ""))))
     rows.sort(key=lambda row: (row["frame_index"] or 0, row["id"]))
@@ -293,7 +302,8 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
             "capture_time_from": "candidates_only: frames without candidates carry no recorded time here"},
         "exposure": {"input_total_s": exposure.get("input_total_seconds"),
                      "stacked_total_s": exposure.get("included_total_seconds"),
-                     "per_frame": "not in the review data"},
+                     "per_row": "exposure_s: the row's exposure time in seconds (FITS EXPTIME of its converted "
+                                "frame); empty when it was not recorded"},
         "not_scanned": _not_scanned(job, originals),
         "coordinates": {"image": "x1..y2: output photograph pixels, zero-based pixel centres, origin top left"
                                  + ("" if not request.get("image_rotation") else ", before the requested rotation"),
@@ -306,7 +316,7 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
             tr('含亮迹版本里的线性母版（master_scene_linear.tif）不含流星；流星只加在成片（final_srgb16.tif、final.jpg）里。'),
             tr('身份是算法建议或复核者的选择，不是认证；同一张曝光的一颗流星可能有多条候选。'),
             tr('未扫描的帧（质量门剔除或未能对齐）里即使有流星，也不在本清单中。'),
-            tr('单张曝光时长不在复核数据里；exposure 只有本段合计。'),
+            tr('exposure_s 是每行那张曝光的时长（秒，取自转换后帧的 FITS EXPTIME），没有记录时留空；exposure 是本段合计。'),
         ],
     }
     named = [(by_id[cid].get("input"), by_id[cid].get("input_sha256")) for cid in kept]

@@ -279,6 +279,14 @@ def _file_name(path) -> str:
     return re.split(r"[\\/]", str(path))[-1] if path else ""
 
 
+def _exposure_text(candidate) -> str:
+    """' · 曝光 10 秒' from the view's exptime_s (FITS EXPTIME); empty when it is not recorded."""
+    seconds = _finite(candidate.get("exptime_s"))
+    if seconds is None or seconds <= 0:
+        return ""
+    return " · " + tr('曝光 {0} 秒', f"{seconds:g}")
+
+
 def _candidate_title(candidate):
     return tr('第') + str(candidate.get("frame_index", "")) + tr('张 · 候选') + candidate["id"].rsplit("-", 1)[-1]
 
@@ -2081,7 +2089,7 @@ class TrailReviewDialog(QDialog):
         review = candidate.get("recall_review") or {}
         # The file name only: a full path does not wrap in the side panel (it stays in the tooltip).
         self.summary.setText(tr("{0} · {1}\n已记录身份：{2}；是否加回：{3}。 ",
-                             cid, _file_name(candidate.get('input')),
+                             cid, _file_name(candidate.get('input')) + _exposure_text(candidate),
                              tr(LABELS[self._recorded_identity(candidate)]),
                              self._recorded_disposition(candidate)) + record_text(review.get("message") or ""))
         self.summary.setToolTip(str(candidate.get('input') or ''))

@@ -246,6 +246,21 @@ def _disposition(candidate, meteor):
     return "建议保留（未采用）" if candidate.get("decision") == "keep" else "默认省略"
 
 
+def _exposure_seconds(value):
+    """The exposure time in seconds from a candidate's provenance.exptime (FITS EXPTIME, e.g. "10."), or None.
+
+    View only. None when the value is absent, unreadable, not finite or not above zero. FITS allows a
+    D exponent ("1.0D+01"); a bool is not a number here.
+    """
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        return None
+    try:
+        seconds = float(value.strip().replace("D", "E").replace("d", "e") if isinstance(value, str) else value)
+    except (ValueError, OverflowError):
+        return None
+    return seconds if math.isfinite(seconds) and seconds > 0 else None
+
+
 def _unverified_thumbnail(path, crops):
     """(review_png, preview_note) for a candidate thumbnail without a recorded content hash.
 
@@ -282,6 +297,8 @@ def _view(value, job, record):
         view["endpoints_native_reference"] = (candidate.get("geometry") or {}).get("native_reference")
         view["frame_index"] = candidate["provenance"]["frame_index"]
         view["input_sha256"] = candidate["provenance"]["input"]["sha256"]
+        # Seconds, from the converted frame's FITS EXPTIME; None when it is not recorded or not usable.
+        view["exptime_s"] = _exposure_seconds(candidate["provenance"].get("exptime"))
         view["explicitly_kept"] = candidate.get("override") == "keep"
         view["review_disposition"] = _disposition(candidate, meteor)
         # identity/default_keep/effective_keep/keep_source include this draft's saved decisions.

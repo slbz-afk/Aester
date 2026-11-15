@@ -53,11 +53,11 @@ def beijing(monkeypatch):
 
 
 def _candidate(cid, frame, *, status="omitted_unverified", priority="low", label="unknown", snr=None,
-               length=None, date=None, measured=True):
+               length=None, date=None, measured=True, exposure=10.0):
     return {"id": cid, "frame_index": frame, "input": f"C:\\Users\\someone\\shots\\DSC_{frame:04d}.NEF",
             "input_sha256": f"{frame:064x}", "status": "measured" if measured else "too_short",
             "suggestion": {"class": label}, "effective_label": label, "decision": "omit",
-            "total_snr": snr, "length_px": length, "date_obs": date,
+            "total_snr": snr, "length_px": length, "date_obs": date, "exptime_s": exposure,
             "endpoints_native_reference": [[100., frame*10.], [200., frame*10.]],
             "endpoints_native_source": [[101., frame*10.], [201., frame*10.]],
             "recall_review": {"status": status, "priority": priority}}
@@ -337,6 +337,22 @@ def test_summary_names_the_file_only_and_keeps_the_path_in_its_tooltip(make, ses
     assert view.summary.toolTip().endswith("DSC_0002.NEF") and "someone" in view.summary.toolTip()
 
 
+def test_summary_shows_the_exposure_time_when_the_view_has_it(make, session):
+    session["candidates"][1]["exptime_s"] = 2.5
+    session["candidates"][4]["exptime_s"] = None
+    view = make(session)
+    view.select_candidate("light_00002-1")
+    assert view.summary.text().startswith("light_00002-1 · DSC_0002.NEF · 曝光 2.5 秒\n")
+    view.select_candidate("light_00003-1")
+    assert "DSC_0003.NEF · 曝光 10 秒\n" in view.summary.text()
+    view.select_candidate("light_00004-1")
+    assert "曝光" not in view.summary.text() and "DSC_0004.NEF\n" in view.summary.text()
+    i18n.set_language("en")
+    english = make(session)
+    english.select_candidate("light_00003-1")
+    assert "DSC_0003.NEF · exposure 10 s\n" in english.summary.text()
+
+
 # ---- composite list ------------------------------------------------------------------------------
 
 DRIVE = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]|\\\\")
@@ -373,7 +389,7 @@ def test_manifest_rows_are_the_published_keeps_with_header_facts(session, tmp_pa
     assert row["source_sha256"] == row["stacked_input_sha256"] == f"{3:064x}"
     assert row["capture_time_utc"] == "2026-12-14T22:00:50Z"
     assert row["capture_time_local"] == "2026-12-15T06:00:50+08:00"
-    assert "exposure_s" not in row and list(row) == list(trail_manifest.COLUMNS)
+    assert row["exposure_s"] == 10.0 and list(row) == list(trail_manifest.COLUMNS)
     assert (row["x1"], row["y1"], row["x2"], row["y2"]) == (100., 30., 200., 30.)
     assert (row["identity"], row["identity_source"], row["keep_source"]) == ("meteor", "algorithm", "algorithm")
     header = manifest["header"]
@@ -389,7 +405,10 @@ def test_manifest_rows_are_the_published_keeps_with_header_facts(session, tmp_pa
     assert header["segment"]["first_capture_time_local"] == "2026-12-15T06:00:10+08:00"
     assert header["segment"]["last_capture_time_utc"] == "2026-12-14T22:00:50Z"
     assert header["segment"]["frames_with_capture_time"] == 3
-    assert header["exposure"] == {"input_total_s": 50.0, "stacked_total_s": 40.0, "per_frame": "not in the review data"}
+    assert header["exposure"]["input_total_s"] == 50.0 and header["exposure"]["stacked_total_s"] == 40.0
+    assert header["exposure"]["per_row"].startswith("exposure_s: the row's exposure time in seconds")
+    assert header["format"] == "aester-composite-list-3"
+    assert any(note.startswith("exposure_s 是每行那张曝光的时长") for note in header["notes"])
     assert header["not_scanned"] == {"count": 1, "frames": [{"frame_index": 5, "file": "DSC_0005.NEF",
                                                              "reason": "quality_gate",
                                                              "details": ["stars 0.34x median"]}]}
@@ -434,6 +453,18 @@ def test_manifest_names_the_originals_behind_dng_working_copies(session, tmp_pat
         assert any("工作副本" in note and "主干相同" in note for note in manifest["header"]["notes"])
     text = trail_manifest.csv_text(trail_manifest.build(session, job, workflow, originals=originals))
     assert not DRIVE.search(text) and "raw-imports" not in text and "shots" not in text
+
+
+def test_manifest_exposure_column_is_empty_when_the_view_has_no_usable_time(session, tmp_path):
+    def exported(value):
+        session["candidates"][3]["exptime_s"] = value
+        manifest = trail_manifest.build(session, _job(tmp_path), _workflow(tmp_path, session, ["light_00003-1"]))
+        table = [line for line in trail_manifest.csv_text(manifest).splitlines() if not line.startswith("#")]
+        return manifest["rows"][0]["exposure_s"], list(csv.DictReader(table))[0]["exposure_s"]
+
+    for value in (None, "10.", 0.0, -1.0, float("nan"), float("inf"), True):
+        assert exported(value) == (None, ""), value
+    assert exported(30) == (30, "30") and exported(2.5) == (2.5, "2.5")
 
 
 def test_manifest_keep_source_is_the_published_one_not_the_draft(session, tmp_path):
