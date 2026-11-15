@@ -10,7 +10,9 @@ Aester 完整免费、开源。
 
 [English](README.en.md) · [下载](https://github.com/slbz-afk/Aester/releases) · [使用指南](docs/USER_GUIDE.md) · [问题反馈](https://github.com/slbz-afk/Aester/issues) · [支持开发](SUPPORT.md)
 
-![Aester 界面：腾格里沙漠 48 张连拍合成，自动加回 9 条流星](docs/images/aester-zh.png)
+![Aester 界面：腾格里沙漠 48 张连拍合成，流星由算法自动判断后加回](docs/images/aester-zh.png)
+
+*腾格里沙漠 48 张连拍合成。流星由算法自动判断后加回，可能判错；可在“复核亮迹候选”里逐条查看和修改。*
 
 ## 使用入门
 

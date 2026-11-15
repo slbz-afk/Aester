@@ -10,7 +10,9 @@ Aester is free and open source. Supporting development is voluntary and unlocks 
 
 [中文](README.md) · [Download](https://github.com/slbz-afk/Aester/releases) · [User guide](docs/USER_GUIDE_EN.md) · [Issues](https://github.com/slbz-afk/Aester/issues) · [Support](SUPPORT.md)
 
-![Aester: 48 frames of the Tengger Desert stacked, 9 meteors added back automatically](docs/images/aester-en.png)
+![Aester: 48 frames of the Tengger Desert stacked, with meteors that the algorithm judged and added back automatically](docs/images/aester-en.png)
+
+*48 frames of the Tengger Desert stacked. The meteors were judged and added back automatically, and some judgements can be wrong; you can check and change each one under **Review trail candidates**.*
 
 ## How it works
 
