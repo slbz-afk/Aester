@@ -746,3 +746,9 @@ EN.update({
     '许可与源码': 'Licences and source',
     '版本 {0}': 'Version {0}',
 })
+
+# Trail review readout: automatic keeps and the high-priority review count.
+EN.update({
+    '自动加回 {0} 条': '{0} added back automatically',
+    '高优先待看 {0} 条（共 {1} 条待核实）': '{0} high priority to check ({1} unverified in all)',
+})

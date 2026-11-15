@@ -1065,6 +1065,20 @@ def test_review_publication_refreshes_results_without_resubmitting(make, app, tm
     window.workflow_dir = None
 
 
+@pytest.mark.parametrize("language,expected", [
+    ("zh_CN", "含亮迹版本 · 自动加回 9 条 · 高优先待看 44 条（共 420 条待核实）"),
+    ("en", "With-trails version · 9 added back automatically · 44 high priority to check (420 unverified in all)")])
+def test_trails_note_names_automatic_keeps_and_the_high_priority_to_check(make, tmp_path, language, expected):
+    """The readout after a meteor night: what was added back on its own, and how many to look at first."""
+    window, _ = make(language)
+    _, _, record = _trail_deliveries(tmp_path)
+    record["trail_review"].update(kept_count=9, kept_ids=[str(n) for n in range(9)], pending_count=420,
+                                  kept_by={"algorithm": 9, "human": 0, "agent": 0},
+                                  scan={"summary": {"recall_review": {"high_priority": 44}}})
+    window._workflow = record
+    assert window._trails_note() == expected
+
+
 def test_finished_workflow_with_automatic_addback_shows_the_trails_version_first(make, app, tmp_path, monkeypatch):
     window, _ = make("en")
     base, trails, record = _trail_deliveries(tmp_path)

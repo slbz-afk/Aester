@@ -155,3 +155,55 @@ EN.update({
     '候选未能测量而被省略，不能据此确认原片没有流星。':
         'The candidate could not be measured and was omitted; this does not confirm that the original has no meteor.',
 })
+
+# Trail review triage (2026-11): priority and keep filters, sortable columns, keys, side panel, composite list.
+EN.update({
+    '高': 'High', '一般': 'Normal', '低': 'Low', '优先级': 'Priority', '加回': 'Added back',
+    '时间': 'Time', '亮度': 'Brightness', '长度': 'Length',
+    '点击按拍摄顺序排列。': 'Click to sort by capture order.',
+    '先看哪些的提示，不是可信度。自动不加回的候选里，端点渐隐、碰到画框边或测量到边界的为“高”。已加回或已有明确选择的显示“—”。':
+        'A hint for what to look at first, not a confidence. Among candidates not added back automatically, those with a fading end, an end at the frame edge or a measurement at its limit are High. Candidates already added back or with an explicit choice show “—”.',
+    '复核优先级只是先看哪些的提示，不是可信度。': 'Review priority is a hint for what to look at first, not a confidence.',
+    '相机记下的拍摄时刻，时区未知。': 'Capture time recorded by the camera; the time zone is unknown.',
+    '{0}（相机时间，时区未知）': '{0} (camera clock, time zone unknown)',
+    '沿轨迹的总信噪比（S/N），越大越亮。': 'Total signal-to-noise ratio (S/N) along the trail; higher is brighter.',
+    '测量出的长度（像素）。': 'Measured length in pixels.',
+    '下一条待复核': 'Next to review',
+    '跳到列表中下一条还没有选择的候选（回车）。': 'Go to the next candidate in the list without a choice yet (Enter).',
+    'K 保留 · O 不加回 · U 恢复默认 · 回车 下一条': 'K keep · O do not add back · U reset · Enter next',
+    '快捷键作用于选中的候选；焦点在列表或预览上时可用。':
+        'Shortcuts act on the selected candidates while the list or the preview has focus.',
+    '先选择候选。': 'Select candidates first.',
+    '当前筛选下的候选都已有选择。': 'Every candidate in this filter already has a choice.',
+    '详情': 'Details',
+    '显示或收起右侧的缩略图、邻帧对照与改判记录。':
+        'Show or hide the side panel with the thumbnail, neighbouring exposures and revisions.',
+    '扫描缩略图': 'Scan thumbnail',
+    '左：本张曝光；右：减去堆栈结果后剩下的部分。': 'Left: this exposure. Right: what remains after subtracting the stacked image.',
+    '此候选没有扫描缩略图。': 'This candidate has no scan thumbnail.',
+    '扫描缩略图无法读取。': 'The scan thumbnail cannot be read.',
+    '导出合成清单…': 'Export composite list…', '导出合成清单': 'Export composite list',
+    '合成清单': 'composite-list', 'CSV 表格 (*.csv)': 'CSV table (*.csv)',
+    '把含亮迹版本加回的每条流星（来自哪张原片、拍摄时刻、位置）存成 CSV 和 JSON，保存在你选的位置。':
+        'Save each meteor added back in the version with trails (source photo, capture time, position) as CSV and JSON, in a place you choose.',
+    '这次复核还没有对应的含亮迹版本，暂时不能导出合成清单。':
+        'There is no version with trails for this review yet, so no composite list can be exported.',
+    '作品文件夹只放成片图像，请把清单存到别处。': 'The works folder holds only the delivered images. Save the list somewhere else.',
+    '已导出合成清单：加回 {0} 条。\n{1}\n{2}': 'Composite list exported: {0} added back.\n{1}\n{2}',
+    '\n清单按已出图的版本；本窗口里还没应用的选择不在其中。':
+        '\nThe list describes the delivered version; choices not yet applied in this window are not in it.',
+    '没有与当前候选记录对应的含亮迹版本，不能导出合成清单。':
+        'No version with trails matches the current candidate record, so no composite list can be exported.',
+    '加回记录里的候选不在当前复核数据中，不能导出合成清单。':
+        'A candidate in the add-back record is missing from the review data, so no composite list can be exported.',
+    '拍摄时刻是相机记下的时间，时区未知，不一定是北京时间或世界时。':
+        'Capture times are the camera clock; the time zone is unknown and may be neither local time nor UTC.',
+    '含亮迹版本里的线性母版（master_scene_linear.tif）不含流星；流星只加在成片（final_srgb16.tif、final.jpg）里。':
+        'The linear master in the version with trails (master_scene_linear.tif) contains no meteors; meteors are added only to the photographs (final_srgb16.tif, final.jpg).',
+    '身份是算法建议或复核者的选择，不是认证；同一张曝光的一颗流星可能有多条候选。':
+        'Identities are algorithm suggestions or reviewer choices, not certification; one meteor in one exposure may appear as several candidates.',
+    '未扫描的帧（质量门剔除或未能对齐）里即使有流星，也不在本清单中。':
+        'Frames that were not scanned (excluded by the quality gate or not aligned) are not covered, even if they hold meteors.',
+    '单张曝光时长不在复核数据里，各行暂不填写；本段合计见 exposure。':
+        'Single-exposure times are not in the review data, so the rows leave them empty; see exposure for the segment totals.',
+})

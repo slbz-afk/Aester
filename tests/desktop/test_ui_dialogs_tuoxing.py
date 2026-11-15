@@ -284,9 +284,10 @@ def test_revision_shows_struck_old_value_new_value_and_provenance(app, trails, s
     caption, old, arrow, new = view.revision_rows['override']
     assert old.text() == '省略' and new.text() == '保留'  # fixture decision 'omit', no disposition text
     assert view.revision_dot.kind() == 'human' and view.revision_dot.isVisibleTo(view)
-    # Tree columns and machine decisions are unchanged by the display.
+    # Tree columns and machine decisions are unchanged by the display (the four decision columns, then
+    # priority, time, brightness and length).
     assert view.decisions == {'trail-1': {'label': 'meteor', 'override': 'keep'}}
-    assert view.list.columnCount() == 4
+    assert view.list.columnCount() == 8
 
 
 def test_agent_draft_choices_keep_agent_provenance_until_changed(app, trails, session):
