@@ -1221,6 +1221,14 @@ class MainWindow(QMainWindow):
         self.regions_button.setObjectName("editRegions")
         self.regions_button.clicked.connect(self.edit_regions)
         left.addWidget(self.regions_button)
+        # Fixed tripod, several segments: the previous job's ground marks onto this first frame (the editor opens
+        # with them, so the boundary is checked before use). The Milky Way is not carried over.
+        self._previous_ground: dict[str, Any] | None = None
+        self.reuse_ground_button = QPushButton(tr('沿用上一段的地景分区'))
+        self.reuse_ground_button.setObjectName("reuseGroundRegions")
+        self.reuse_ground_button.clicked.connect(self.reuse_previous_ground)
+        self.reuse_ground_button.hide()
+        left.addWidget(self.reuse_ground_button)
 
         colour_head = self._step_heading(left, "②", tr('调色'))
         self.reset_color_button = QPushButton(tr('重置调整'))
@@ -2772,7 +2780,37 @@ class MainWindow(QMainWindow):
         self.message_label.setText(message)
         self._update_controls()
 
-    def edit_regions(self) -> None:
+    def _remember_ground(self, project: dict[str, Any] | None) -> None:
+        """Keep a submitted or opened job's ground marks for the next segment (Milky Way never carried over)."""
+        from starstack.regions import scene_from_marks
+        if not project or scene_from_marks(project) != 'landscape':
+            return
+        reference = (project.get('source_binding') or {}).get('reference') or {}
+        self._previous_ground = {
+            "operations": [dict(op) for op in project.get('operations') or []
+                           if op.get('kind') == 'horizon' or op.get('kind') == 'paint'],
+            "width": reference.get('width'), "height": reference.get('height'),
+            "rotation": int(reference.get('image_rotation', 0) or 0)}
+
+    def _reusable_ground(self) -> tuple[bool, str]:
+        """(offered, why not) for 沿用上一段的地景分区 on the current selection."""
+        previous = self._previous_ground
+        reference = self._reference_data or {}
+        if (not previous or not self.input_files or not reference or self._regions_drawn()
+                or self._reference_scene != tuple(self.input_files)
+                or ((self.workflow_dir or self.job_dir) and not self._job_detached)):
+            return False, ''
+        same = (previous["width"] == reference.get('width') and previous["height"] == reference.get('height')
+                and previous["rotation"] == int(reference.get('image_rotation', 0) or 0))
+        return True, '' if same else tr('上一段的照片尺寸或方向不同，不能沿用；请重新标记。')
+
+    def reuse_previous_ground(self) -> None:
+        offered, reason = self._reusable_ground()
+        if not offered or reason:
+            return
+        self.edit_regions(seed_operations=self._previous_ground["operations"])
+
+    def edit_regions(self, seed_operations: list[dict[str, Any]] | None = None) -> None:
         if self._busy or self.job_state in ACTIVE_STATES:
             return
         reference = self._reference_data
@@ -2783,14 +2821,24 @@ class MainWindow(QMainWindow):
         from starstack import regions
         from aester_desktop.region_dialog import RegionDialog
         files, current = list(self.input_files), self._regions_project
+        seed = [dict(op) for op in seed_operations] if isinstance(seed_operations, list) and seed_operations else None
         try:
             work_root = self._processing_root()
         except ValueError as error:
             self.message_label.setText(tr('操作未完成：') + translate_message(str(error))); return
         self._busy = True
         self._update_controls()
+
+        def prepare():
+            if seed is not None:
+                # A new project bound to these photos, carrying the previous segment's ground marks.
+                return regions.revise(regions.create_project(reference, files), operations=seed, scene_mode='landscape')
+            return regions.validate_project(current, input_files=files) if current else regions.create_project(reference, files)
+
         def prepared(project):
             self._busy = False
+            if seed is not None:
+                self.message_label.setText(tr('已带入上一段的地景标记；核对边界后点“使用这些分区”。'))
             dialog = RegionDialog(reference, project, self)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self._update_controls()
@@ -2810,8 +2858,7 @@ class MainWindow(QMainWindow):
                 self.message_label.setText(tr('分区已保存。原片未改动；颜色调整可继续沿用这些范围。'))
                 self._update_controls()
             self._run_async('save-regions', lambda: regions.build_masks(selected, work_root, input_files=files), saved)
-        self._run_async('prepare-regions', lambda: regions.validate_project(current, input_files=files) if current else
-                        regions.create_project(reference, files), prepared)
+        self._run_async('prepare-regions', prepare, prepared)
 
     def save_editing_project(self, path: str | None = None) -> None:
         if self._busy or self.job_state in ACTIVE_STATES:
@@ -3229,6 +3276,10 @@ class MainWindow(QMainWindow):
             control.setEnabled(idle and bool(self.input_files) and orientation_ready
                                and not self._reference_running and not self._reference_pending)
         self.regions_button.setEnabled(idle and bool(self.input_files) and orientation_ready)
+        offered, mismatch = self._reusable_ground()
+        self.reuse_ground_button.setVisible(offered)
+        self.reuse_ground_button.setEnabled(idle and offered and not mismatch and orientation_ready)
+        self.reuse_ground_button.setToolTip(mismatch or tr('把上一段画好的地景边界放到这一段的首帧上，核对后使用；银河需要重新圈定。'))
         from starstack.regions import milkyway_active
         mw_ready = bool(self._regions_project and milkyway_active(self._regions_project))
         self.milkyway_enabled.setEnabled(idle and mw_ready)
@@ -3591,7 +3642,7 @@ class MainWindow(QMainWindow):
             self.style_tabs, self.open_button,
             self.rotate_left_button, self.rotate_right_button, self.restore_orientation_button,
             self.surround_grey_button, self.night_button,
-            self.regions_button,
+            self.regions_button, self.reuse_ground_button,
             self.reset_color_button, self.warmth_slider, self.warmth_value, self.tint_slider, self.tint_value,
             self.exposure_slider, self.exposure_value,
             self.meteor_preset_button, self.trails_enabled, self.stars_enabled, self.workflow_auto_strength,
@@ -3844,6 +3895,7 @@ class MainWindow(QMainWindow):
         if self._regions_path:
             from starstack import regions
             self._regions_project = regions.load_project(self._regions_path, verify_sources=False)
+            self._remember_ground(self._regions_project)
         self.milkyway_enabled.setChecked(config.get('milkyway_enabled') is True)
         self.milkyway_strength.setValue(float(config.get('milkyway_strength', .6)) * 100)
         self.workflow_milkyway_offset.setValue(float(config.get('milkyway_offset', 0)) * 100)

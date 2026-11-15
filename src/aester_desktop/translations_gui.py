@@ -804,4 +804,12 @@ EN.update({
         'Open the selected job in the main window to view its photographs or continue the trail review.',
     '等待当前处理或清理结束后再打开。': 'Wait for the current processing or cleaning to finish before opening.',
     '请在列表中选择一个任务。': 'Select one job in the list.',
+    '沿用上一段的地景分区': 'Reuse the previous segment’s foreground',
+    '把上一段画好的地景边界放到这一段的首帧上，核对后使用；银河需要重新圈定。':
+        'Puts the foreground boundary drawn for the previous segment on this segment’s first frame for you to check '
+        'and use; the Milky Way has to be drawn again.',
+    '上一段的照片尺寸或方向不同，不能沿用；请重新标记。':
+        'The previous segment’s photos differ in size or orientation, so its regions cannot be reused; mark them again.',
+    '已带入上一段的地景标记；核对边界后点“使用这些分区”。':
+        'The previous segment’s foreground marks are in place; check the boundary, then click “Use these regions”.',
 })
