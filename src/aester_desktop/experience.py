@@ -151,10 +151,14 @@ class Experience(QObject):
             self.cache_jobs.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
             self.cache_jobs.setMinimumHeight(200)
             self.cache_jobs.itemSelectionChanged.connect(self.update_storage_controls)
+            self.cache_jobs.itemDoubleClicked.connect(lambda *_: self.open_selected_job())
             form.addWidget(self.cache_jobs, 1)
             buttons = QHBoxLayout()
             self.refresh_cache_button = QPushButton(tr('刷新列表')); self.refresh_cache_button.setObjectName('refreshCacheJobs')
             self.refresh_cache_button.clicked.connect(self.refresh_cache_jobs); buttons.addWidget(self.refresh_cache_button)
+            # Back to a finished task (e.g. to continue a long trail review after a restart).
+            self.open_cache_job_button = QPushButton(tr('打开此任务')); self.open_cache_job_button.setObjectName('openCacheJob')
+            self.open_cache_job_button.clicked.connect(self.open_selected_job); buttons.addWidget(self.open_cache_job_button)
             buttons.addStretch(1)
             self.clean_cache_button = QPushButton(tr('清理所选任务的中间文件…')); self.clean_cache_button.setObjectName('cleanCacheButton')
             self.clean_cache_button.clicked.connect(self.clean_selected_caches); buttons.addWidget(self.clean_cache_button)
@@ -189,12 +193,17 @@ class Experience(QObject):
         return (not w._busy and w.job_state not in ('queued', 'running', 'cancel_requested')
                 and not w._closing_requested and not self._cleaning_cache)
 
-    def _selected_plans(self):
+    def _selected_rows(self):
+        """Every selected job (any state): the rows a task can be opened from."""
         jobs = getattr(self, 'cache_jobs', None)
         if jobs is None:
             return []
         plans = [item.data(0, Qt.ItemDataRole.UserRole) for item in jobs.selectedItems()]
-        return [plan for plan in plans if isinstance(plan, dict) and plan.get('plan_id')]
+        return [plan for plan in plans if isinstance(plan, dict) and plan.get('workflow_dir')]
+
+    def _selected_plans(self):
+        """The selected jobs that can be cleaned now (they carry a plan id)."""
+        return [plan for plan in self._selected_rows() if plan.get('plan_id')]
 
     def update_storage_controls(self):
         """Cleaning is offered only while the window is idle and cleanable jobs are selected."""
@@ -207,6 +216,18 @@ class Experience(QObject):
         button.setToolTip('' if button.isEnabled() else
                           tr('等待当前处理或清理结束后再清理。') if not idle else tr('请先在列表中选择可清理的任务。'))
         self.refresh_cache_button.setEnabled(not self._listing_cache and not self._cleaning_cache)
+        opener = self.open_cache_job_button
+        opener.setEnabled(idle and len(self._selected_rows()) == 1)
+        opener.setToolTip(tr('在主窗口打开所选任务：查看作品，或继续复核亮迹。') if opener.isEnabled() else
+                          tr('等待当前处理或清理结束后再打开。') if not idle else tr('请在列表中选择一个任务。'))
+
+    def open_selected_job(self):
+        """Open the one selected task in the main window (read only until you act there)."""
+        rows = self._selected_rows()
+        if len(rows) != 1 or not self._storage_idle():
+            return
+        self.window._advanced_dialogs['storage'].close()
+        self.window.load_existing_job(rows[0]['workflow_dir'])
 
     def _storage_visible(self):
         dialog = self.window._advanced_dialogs.get('storage')
@@ -302,8 +323,7 @@ class Experience(QObject):
             item.setToolTip(0, plan['workflow_dir'])
             item.setToolTip(2, job.get('delivery_dir') or '')
             item.setToolTip(5, reason)
-            if not plan.get('plan_id'):
-                item.setFlags(Qt.ItemFlag.ItemIsEnabled)          # shown, never selectable
+            # Every row can be selected and opened; only rows with a plan id can be cleaned (_selected_plans).
             self.cache_jobs.addTopLevelItem(item)
         for column in range(len(CACHE_COLUMNS) - 1):
             if column != 2:                       # the works path is long: elided, full path in its tooltip
@@ -369,6 +389,7 @@ class Experience(QObject):
         self.window._update_controls()
         if self.window.workflow_dir:
             self.window.refresh_workflow()      # a cleaned current job disables trail review
+        self.window._schedule_disk_estimate(force=True)     # the cache drive has more room now
         self.refresh_cache_jobs()
 
     def maybe_welcome(self):
@@ -383,6 +404,16 @@ class Experience(QObject):
     def _welcome_done(self):
         self._welcome_seen()
         self.window._advanced_dialogs['welcome'].close()
+
+    def _welcome_meteor(self):
+        """Turn meteor-shower mode on (remembered) and go to the main window, where its hints are shown."""
+        w = self.window
+        if w._busy or w.job_state in ('queued', 'running', 'cancel_requested'):
+            w.message_label.setText(tr('请等当前处理完成后再打开流星雨合成。'))
+            return
+        w.set_meteor_preset(True)
+        self._welcome_done()
+        self.window.message_label.setText(tr('已打开流星雨合成：流星自动加回，其他亮迹待你复核。下次启动仍然打开。'))
 
     def _nox_description(self):
         from starstack.components import nox_install_info
@@ -414,6 +445,10 @@ class Experience(QObject):
             form.addWidget(self._label(tr('你可以直接操作，也可以让已经配置的大模型助手通过 MCP 操作。连接助手是可选的，不需要在 Aester 填入模型密钥。'), 'muted'))
             begin = QPushButton(tr('直接开始')); begin.setObjectName('primary'); themes.set_role(begin, 'primary')
             begin.clicked.connect(self._welcome_done); form.addWidget(begin)
+            # 「流星雨合成」: the same switch as in the right column (trail keeping on, remembered).
+            meteor = QPushButton(tr('流星雨合成')); meteor.setObjectName('welcomeMeteorShower'); meteor.setAutoDefault(False)
+            meteor.clicked.connect(self._welcome_meteor); form.addWidget(meteor)
+            form.addWidget(self._label(tr('拍流星雨时用：保留流星，其他亮迹待你复核；每段照片出一张图。'), 'muted'))
             if getattr(self.window, '_nox_offered', False):
                 form.addWidget(self._label(self._nox_description(), 'muted'))
                 nox = QPushButton(tr('同意并准备可选 nox 组件'))

@@ -4,10 +4,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import math
 import sys
 import threading
+from datetime import datetime
 from pathlib import Path
 from starstack.i18n import tr, set_language, get_language, normalize_language, startup_language, translate_message
 from typing import Any, Callable
@@ -49,6 +51,10 @@ STAGE_LABELS = {
 
 # Kept for integrations which used the original dark stylesheet.
 STYLESHEET = themes.stylesheet(themes.DEFAULT_THEME)
+# Preferences of the meteor-shower mode and of the recent-tasks list (File → 最近的任务).
+METEOR_PRESET_KEY = "effects/meteor_shower"
+RECENT_TASKS_KEY = "history/recent_workflows"
+RECENT_TASKS_MAX = 10
 
 
 def nox_download_offered() -> bool:
@@ -462,6 +468,11 @@ class MainWindow(QMainWindow):
         self._jpeg_estimate_timer.setSingleShot(True)
         self._jpeg_estimate_timer.setInterval(150)
         self._jpeg_estimate_timer.timeout.connect(self._update_jpeg_estimate)
+        # The cache-space estimate beside 「开始合成」, recomputed (debounced) when the selection or stack mode changes.
+        self._disk_estimate_timer = QTimer(self)
+        self._disk_estimate_timer.setSingleShot(True)
+        self._disk_estimate_timer.setInterval(250)
+        self._disk_estimate_timer.timeout.connect(self._launch_disk_estimate)
         self._build_ui()
         self._restore_preferences()
         self.timer = QTimer(self)
@@ -486,6 +497,8 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(0, self.check_backend)
         from .experience import Experience
         self.experience = Experience(self)
+        self.cache_dir.textChanged.connect(lambda: self._schedule_disk_estimate())
+        self.stack_range_checkbox.toggled.connect(lambda: self._schedule_disk_estimate())
         self._update_controls()
 
     def _siril_path_edited(self) -> None:
@@ -770,6 +783,122 @@ class MainWindow(QMainWindow):
             tooltip = hint + ("\n" + tooltip if tooltip else "")
         label.setText(text)
         label.setToolTip(tooltip)
+        label.show()
+
+    # ------------------------------------------------------------------ cache space before 「开始合成」
+
+    def _disk_estimate_inputs(self) -> tuple[tuple[str, ...], str, str | None] | None:
+        """(files, stack mode, cache root) of the job 「开始合成」 would submit now, or None when no new job is
+        being prepared (no photos, a job running, or a submitted job's own selection on view)."""
+        if (not self.input_files or self.job_state in ACTIVE_STATES or self._closing_requested
+                or ((self.workflow_dir or self.job_dir) and not self._job_detached)):
+            return None
+        from . import disk_space
+        mode = disk_space.stack_mode(self.stack_engine_path.text().strip() or None,
+                                     self.stack_range_checkbox.isChecked())
+        try:
+            root = self._processing_root() if getattr(self, "experience", None) is not None else None
+        except ValueError:
+            root = None
+        return tuple(self.input_files), mode, root
+
+    def _schedule_disk_estimate(self, *, force: bool = False) -> None:
+        timer = getattr(self, "_disk_estimate_timer", None)
+        label = getattr(self, "disk_estimate_label", None)
+        if timer is None or label is None or self._closing_requested:
+            return
+        inputs = self._disk_estimate_inputs()
+        if inputs is None:
+            timer.stop()
+            self._disk_estimate_key = None
+            self._disk_estimate = None
+            self._disk_estimate_serial += 1          # a result still in flight is dropped
+            label.clear()
+            label.hide()
+            return
+        if force or inputs != self._disk_estimate_key:
+            timer.start()
+        else:
+            self._show_disk_estimate()               # only the trails note may have changed
+
+    def _launch_disk_estimate(self) -> None:
+        inputs = self._disk_estimate_inputs()
+        if inputs is None or self._closing_requested:
+            return
+        from . import disk_space
+        self._disk_estimate_key = inputs
+        self._disk_estimate_serial += 1
+        serial = self._disk_estimate_serial
+        files, mode, root = inputs
+        if self._disk_estimate is None:
+            self.disk_estimate_label.setText(tr('正在估算所需缓存空间…'))
+            self.disk_estimate_label.setToolTip("")
+            self.disk_estimate_label.show()
+
+        def compute() -> dict[str, Any]:
+            try:
+                return {"ok": True, **disk_space.job_estimate(list(files), mode, root)}
+            except Exception as error:                 # an unreadable file: say so, never block the window
+                return {"ok": False, "message": str(error) or type(error).__name__}
+
+        def computed(result: dict[str, Any]) -> None:
+            if serial != self._disk_estimate_serial:
+                return
+            self._disk_estimate = result
+            self._show_disk_estimate()
+        self._start_worker(f"disk-estimate:{serial}", compute, computed)
+
+    @staticmethod
+    def _gigabytes(value: int) -> str:
+        """Decimal gigabytes, as the engine's admission refusal writes them (a no-break space keeps 'GB' with
+        its number when the line wraps)."""
+        return f"{value / 1e9:.1f}\u00a0GB"
+
+    def _show_disk_estimate(self) -> None:
+        label = self.disk_estimate_label
+        result = self._disk_estimate
+        if result is None:
+            return
+        if not result.get("ok"):
+            label.setText(tr('暂时无法估算所需缓存：') + translate_message(result.get("message") or ""))
+            label.setToolTip("")
+            themes.set_role(label, "hint")
+            label.show()
+            return
+        from . import disk_space
+        record, free = result["record"], result["free_bytes"]
+        need = int(record["required_bytes"])
+        lines = [tr('预计占用缓存约 {0} · 缓存盘可用 {1}', self._gigabytes(need), self._gigabytes(free))
+                 if free is not None else tr('预计占用缓存约 {0}；读不到缓存盘的可用空间。', self._gigabytes(need))]
+        short = free is not None and free < need
+        if short:
+            frames = disk_space.fitting_frames(record, free)
+            lines.append(tr('空间不够。可分段：每段不超过 {0} 张，分别合成；或在“设置 → 作品与缓存”换到更大的盘。', frames)
+                         if frames >= 3 else
+                         tr('空间不够，这块盘放不下一段。请在“设置 → 作品与缓存”换到更大的盘，或清理已复核的旧任务。'))
+        mode = record.get("stack_range_mode")
+        if mode != disk_space.LEGACY and int(record["frames"]) >= disk_space.LONG_SEQUENCE and result["legacy_required"]:
+            ratio = need / result["legacy_required"]
+            lines.append(tr('长序列建议改用 Siril 官方构建：改进构建需要的缓存约为 {0:.1f} 倍。', ratio)
+                         if mode == disk_space.FINITE else
+                         tr('长序列建议关闭“保护堆栈高光”：它需要的缓存约为 {0:.1f} 倍。', ratio))
+        if self.trails_enabled.isChecked() and not self._meteor_preset:   # the preset's hints already say it
+            lines.append(tr('复核亮迹要用这些缓存，复核完再清理。'))
+        label.setText("\n".join(lines))
+        if record.get("basis") == "frames_x_frame_volume":
+            detail = tr('{0} 张 × 每张 {1}（转换帧 + 配准帧）+ 母版与产物 {2} + 原片副本 {3}',
+                        int(record["frames"]), self._gigabytes(record["per_frame_bytes"]),
+                        self._gigabytes(record["fixed_bytes"]), self._gigabytes(record["source_bytes"]))
+            if record.get("range_trial_bytes"):
+                detail += tr(' + 范围保护试验副本 {0}', self._gigabytes(record["range_trial_bytes"]))
+            detail += tr('，× {0} + 余量 {1}', record["safety_factor"], self._gigabytes(record["margin_bytes"]))
+        else:
+            detail = tr('读不到首帧尺寸，按原片大小估算：{0} × {1} + 余量 {2}',
+                        self._gigabytes(record["source_bytes"]), record["legacy_factor"],
+                        self._gigabytes(record["margin_bytes"]))
+        label.setToolTip(tr('与开始时的空间检查用同一算法：') + detail + "\n"
+                         + tr('合计 {0} 字节。处理中途写满磁盘会失败。', f"{need:,}"))
+        themes.set_role(label, "error" if short else "hint")
         label.show()
 
     def _step_heading(self, layout: QVBoxLayout, number: str, title: str) -> QHBoxLayout:
@@ -1099,6 +1228,15 @@ class MainWindow(QMainWindow):
         self.exposure_value = self.exposure_slider.value_field
 
         self._effects_heading = self._step_heading(left, "③", tr('可选效果')).parentWidget()
+        # 「流星雨合成」: one click turns trail keeping on and keeps it on at the next start (preference
+        # effects/meteor_shower). It adds nothing to the request: a job with trails ticked by hand is the same job.
+        self._meteor_preset = False
+        self.meteor_preset_button = QPushButton(tr('流星雨合成'))
+        self.meteor_preset_button.setObjectName("meteorShowerPreset")
+        self.meteor_preset_button.setCheckable(True)
+        self.meteor_preset_button.setToolTip(tr('打开“保留流星等亮迹”，下次启动仍然打开。每段照片出一张图。'))
+        self.meteor_preset_button.toggled.connect(self._meteor_preset_clicked)
+        left.addWidget(self.meteor_preset_button)
         self.trails_enabled = QCheckBox(tr('保留流星等亮迹'))
         self.trails_enabled.setObjectName("trailsEnabled")
         self.trails_enabled.setToolTip(tr('仅在开启时扫描。可信的流星自动加回；其他亮迹等你复核后再加回。'))
@@ -1108,7 +1246,14 @@ class MainWindow(QMainWindow):
         self.trails_note.hide()
         self.trails_enabled.toggled.connect(self.trails_note.setVisible)
         self.trails_enabled.toggled.connect(lambda: self._schedule_jpeg_estimate())
+        self.trails_enabled.toggled.connect(self._trails_toggled)
         left.addWidget(self.trails_note)
+        self.meteor_hints = self._label("")
+        self.meteor_hints.setObjectName("meteorShowerHints")
+        self.meteor_hints.setTextFormat(Qt.TextFormat.PlainText)
+        themes.set_role(self.meteor_hints, "hint")
+        self.meteor_hints.hide()
+        left.addWidget(self.meteor_hints)
         self.stars_enabled = QCheckBox(tr('整理星点'))
         self.stars_enabled.setObjectName("starsEnabled")
         left.addWidget(self.stars_enabled)
@@ -1174,6 +1319,16 @@ class MainWindow(QMainWindow):
         pictures = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.PicturesLocation)
         self.output_dir.setText(str(Path(pictures or str(Path.home() / "Pictures")) / "Aester"))
         self._build_jpeg_quality(sidebar)
+        # Cache space the job will need, computed as the engine's admission does (disk_space.job_estimate).
+        self.disk_estimate_label = self._label("", "muted")
+        self.disk_estimate_label.setObjectName("diskEstimate")
+        self.disk_estimate_label.setTextFormat(Qt.TextFormat.PlainText)
+        themes.set_role(self.disk_estimate_label, "hint")
+        self.disk_estimate_label.hide()
+        sidebar.addWidget(self.disk_estimate_label)
+        self._disk_estimate: dict[str, Any] | None = None
+        self._disk_estimate_serial = 0
+        self._disk_estimate_key: Any = None
         buttons = QHBoxLayout()
         buttons.setSpacing(8)
         self.start_button = QPushButton(tr('开始合成'))
@@ -1391,6 +1546,8 @@ class MainWindow(QMainWindow):
             quality = jpeg_estimate.DEFAULT       # absent or unusable: the default, nothing written back
         self._jpeg_preference = quality
         self._set_jpeg_quality_quietly(quality)
+        if _preference_bool(settings.value(METEOR_PRESET_KEY, False)):
+            self.set_meteor_preset(True, persist=False)
         mode = settings.value('stack_backend_mode', 'custom' if self.stack_engine_path.text().strip() else 'official')
         self.stack_backend_choice.blockSignals(True)
         self.stack_backend_choice.setCurrentIndex(max(0, self.stack_backend_choice.findData(mode)))
@@ -1470,6 +1627,58 @@ class MainWindow(QMainWindow):
     def _surround_toggled(self, on: bool) -> None:
         if on != (self._surround == "mid_grey"):
             self.set_surround("mid_grey" if on else self._surround_before_grey)
+
+    # ------------------------------------------------------------------ 「流星雨合成」 preset
+
+    def set_meteor_preset(self, on: bool, *, persist: bool = True) -> None:
+        """Meteor-shower mode: trail keeping on now and at every start, with the short shooting hints.
+
+        Only the 保留流星等亮迹 checkbox changes, so the job request is the one a hand-ticked box sends;
+        a job loaded for viewing never writes this preference.
+        """
+        self._meteor_preset = bool(on)
+        if self.meteor_preset_button.isChecked() != self._meteor_preset:
+            with QSignalBlocker(self.meteor_preset_button):
+                self.meteor_preset_button.setChecked(self._meteor_preset)
+        # The state in words as well as in the checked style: a second click turns it off.
+        self.meteor_preset_button.setText(tr('流星雨合成 · 已打开') if self._meteor_preset else tr('流星雨合成'))
+        if self._meteor_preset and not self.trails_enabled.isChecked():
+            self.trails_enabled.setChecked(True)
+        elif not self._meteor_preset and persist and self.trails_enabled.isChecked():
+            self.trails_enabled.setChecked(False)
+        settings = getattr(self, "_preferences", None)
+        if persist and settings is not None:
+            settings.setValue(METEOR_PRESET_KEY, self._meteor_preset)
+            settings.sync()
+        self._update_meteor_hints()
+        self._schedule_disk_estimate()          # its review-cache note moves into the hints and back
+
+    def _meteor_preset_clicked(self, on: bool) -> None:
+        self.set_meteor_preset(on)
+        if on:
+            self.message_label.setText(tr('已打开流星雨合成：流星自动加回，其他亮迹待你复核。下次启动仍然打开。'))
+
+    def _trails_toggled(self, on: bool) -> None:
+        """Unticking 保留流星等亮迹 by hand ends meteor-shower mode; a loaded job's value never does."""
+        if not on and self._meteor_preset and not self._restoring_project:
+            self.set_meteor_preset(False)
+        else:
+            self._update_meteor_hints()
+        self._schedule_disk_estimate()
+
+    def _update_meteor_hints(self) -> None:
+        label = getattr(self, "meteor_hints", None)
+        if label is None:
+            return
+        shown = self._meteor_preset and self.trails_enabled.isChecked()
+        if shown:
+            lines = []
+            if self._scene_from_current_marks() != 'landscape':
+                lines.append(tr('· 照片里有地景时，先在 ① 标记地景。'))
+            lines.append(tr('· 每段约 30 分钟、约 150 张，先到为准；每段出一张图。'))
+            lines.append(tr('· 复核完亮迹再清理缓存。'))
+            label.setText("\n".join(lines))
+        label.setVisible(shown)
 
     def showEvent(self, event: Any) -> None:  # noqa: N802 - Qt override
         super().showEvent(event)
@@ -1597,6 +1806,12 @@ class MainWindow(QMainWindow):
         action(files, "output", tr('更改保存位置…'), self._pick_output)
         files.addSeparator()
         action(files, "load", tr('打开已有任务…'), self.load_button.click, button=self.load_button, shortcut="Ctrl+O")
+        # Tasks submitted or opened here, newest first (preference history/recent_workflows), so a long trail
+        # review can be continued after a restart without looking for workflow.json in the cache.
+        self.recent_menu = files.addMenu(tr('最近的任务'))
+        self.recent_menu.setObjectName("recentTasksMenu")
+        self.recent_menu.setToolTipsVisible(True)
+        self.recent_menu.aboutToShow.connect(self._fill_recent_menu)
         action(files, "resume", tr('继续未完成的任务…'), self.resume_button.click, button=self.resume_button)
         action(files, "results", tr('打开作品目录'), self.open_button.click, button=self.open_button)
         files.addSeparator()
@@ -2064,7 +2279,9 @@ class MainWindow(QMainWindow):
             self.message_label.setText(tr('未添加新照片：请选择支持的 RAW / FITS 文件；重复文件只保留一次。'))
             return
         if len(self.input_files) + len(added) > 300:
-            self.message_label.setText(tr('每个任务最多选择 300 张照片，请分组处理。'))
+            # The engine refuses more than 300 frames per job; a meteor night is processed in segments.
+            self.message_label.setText(tr('一共 {0} 张，超过每个任务 300 张的上限。请分段处理：每段约 150 张、约 30 分钟，'
+                                          '分别添加并合成，每段出一张图。', len(self.input_files) + len(added)))
             return
         selected = [self._import_originals.get(p, p) for p in self.input_files] + added
         if any(Path(p).suffix.lower() in RAW - {'.dng'} for p in selected):
@@ -2211,6 +2428,8 @@ class MainWindow(QMainWindow):
             self._regions_project = None
             self._regions_path = None
             self.milkyway_enabled.setChecked(False)
+            if self._meteor_preset and not self.trails_enabled.isChecked():
+                self.trails_enabled.setChecked(True)     # a viewed job without trails is left behind
             self._reference_cache_epoch += 1
             self._reference_generation += 1
             self._reference_data = None
@@ -2315,8 +2534,11 @@ class MainWindow(QMainWindow):
                 self.raw_audit_status.setText(tr('无法自动打开检查目录，可复制此路径手动打开：\n') + self._raw_audit_dir)
 
     def _pick_job_file(self) -> None:
+        # workflow.json lives in the work cache (the works folder holds only the photographs).
+        cache = self.cache_dir.text().strip() if hasattr(self, "cache_dir") else ""
+        start = cache if cache and Path(cache).is_dir() else self.output_dir.text() or str(WORKSPACE / "outputs")
         path, _ = QFileDialog.getOpenFileName(
-            self, tr('打开已有任务'), self.output_dir.text() or str(WORKSPACE / "outputs"),
+            self, tr('打开已有任务'), start,
             tr('任务记录 (workflow.json job.json);;JSON 文件 (*.json)'),
         )
         if path:
@@ -2328,6 +2550,78 @@ class MainWindow(QMainWindow):
         )
         if path:
             self.load_existing_job(path)
+
+    # ------------------------------------------------------------------ recent tasks (File → 最近的任务)
+
+    def recent_tasks(self) -> list[dict[str, Any]]:
+        """The remembered tasks, newest first: {'path', 'created_at', 'frames', 'trails'} (unreadable entries dropped)."""
+        settings = self._preferences
+        if settings is None:
+            return []
+        try:
+            entries = json.loads(str(settings.value(RECENT_TASKS_KEY, "") or "[]"))
+        except ValueError:
+            return []
+        if not isinstance(entries, list):
+            return []
+        return [entry for entry in entries if isinstance(entry, dict) and isinstance(entry.get("path"), str)
+                and entry["path"].strip()][:RECENT_TASKS_MAX]
+
+    def _remember_task(self, record: dict[str, Any]) -> None:
+        """Put a submitted or opened workflow first in the recent list (labels are kept with it, so the menu reads
+        no record file)."""
+        settings = self._preferences
+        directory = record.get("workflow_dir")
+        if settings is None or not directory:
+            return
+        directory = str(Path(str(directory)).resolve())
+        config = record.get("config") or {}
+        files = config.get("input_files")
+        entry = {"path": directory, "created_at": str(record.get("created_at") or ""),
+                 "frames": len(files) if isinstance(files, list) else None,
+                 "trails": config.get("trails_enabled") is True}
+        entries = [item for item in self.recent_tasks()
+                   if os.path.normcase(item["path"]) != os.path.normcase(directory)]
+        settings.setValue(RECENT_TASKS_KEY, json.dumps([entry, *entries][:RECENT_TASKS_MAX], ensure_ascii=False))
+        settings.sync()
+
+    @staticmethod
+    def _recent_label(entry: dict[str, Any]) -> str:
+        try:
+            when = datetime.fromisoformat(str(entry.get("created_at"))).astimezone().strftime("%Y-%m-%d %H:%M")
+        except (TypeError, ValueError):
+            when = Path(entry["path"]).name
+        frames = entry.get("frames")
+        text = tr('{0} · {1} 张', when, frames) if type(frames) is int else when
+        return text + (tr(' · 含亮迹') if entry.get("trails") is True else "")
+
+    def _fill_recent_menu(self) -> None:
+        menu = self.recent_menu
+        menu.clear()
+        idle = not self._busy and self.job_state not in ACTIVE_STATES and not self._closing_requested
+        shown = 0
+        for entry in self.recent_tasks():
+            path = entry["path"]
+            if not (Path(path) / "workflow.json").is_file():
+                continue                       # moved or deleted: not offered
+            item = menu.addAction(self._recent_label(entry))
+            item.setToolTip(path)
+            item.setEnabled(idle)
+            item.triggered.connect(lambda checked=False, chosen=path: self.load_existing_job(chosen))
+            shown += 1
+        if not shown:
+            empty = menu.addAction(tr('还没有最近的任务'))
+            empty.setEnabled(False)
+        menu.addSeparator()
+        clear = menu.addAction(tr('清空列表'))
+        clear.setEnabled(bool(self.recent_tasks()))
+        clear.triggered.connect(self.clear_recent_tasks)
+
+    def clear_recent_tasks(self) -> None:
+        """Forget the list only; no task or file is touched."""
+        if self._preferences is not None:
+            self._preferences.remove(RECENT_TASKS_KEY)
+            self._preferences.sync()
 
     def load_existing_job(self, path: str) -> None:
         """Attach the GUI to a persisted task without resubmitting it."""
@@ -2897,9 +3191,11 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'cache_dir'):
             self.cache_dir.setEnabled(idle)
         for control in (self.add_files_button, self.file_strip, self.scene_mode, self.trails_enabled,
-                        self.stars_enabled, self.warmth_slider, self.tint_slider, self.exposure_slider,
-                        self.reset_color_button):
+                        self.meteor_preset_button, self.stars_enabled, self.warmth_slider, self.tint_slider,
+                        self.exposure_slider, self.reset_color_button):
             control.setEnabled(idle)
+        self._update_meteor_hints()
+        self._schedule_disk_estimate()
         # Star reduction needs a model: a published nox download or one the user chose in Settings. Without
         # either the box stays off; one already ticked (an older project) stays clickable so it can be cleared.
         stars_possible = self._nox_offered or bool(self.star_model_path.text().strip())
@@ -3290,7 +3586,8 @@ class MainWindow(QMainWindow):
             self.regions_button,
             self.reset_color_button, self.warmth_slider, self.warmth_value, self.tint_slider, self.tint_value,
             self.exposure_slider, self.exposure_value,
-            self.trails_enabled, self.stars_enabled, self.workflow_auto_strength, self.workflow_background_strength,
+            self.meteor_preset_button, self.trails_enabled, self.stars_enabled, self.workflow_auto_strength,
+            self.workflow_background_strength,
             self.workflow_milkyway_offset, self.workflow_save_starless, self.workflow_save_star_layer,
             self.star_component_button, self.milkyway_enabled, self.milkyway_strength,
             self.output_dir, self._output_browse_button, self.jpeg_quality_slider, self.jpeg_quality_value,
@@ -3303,6 +3600,11 @@ class MainWindow(QMainWindow):
         self._tab_chain = chain
 
     def _run_async(self, name: str, operation: Callable[[], Any], callback: Callable[[Any], None]) -> None:
+        self._start_worker(name, operation, callback)
+
+    def _start_worker(self, name: str, operation: Callable[[], Any], callback: Callable[[Any], None]) -> None:
+        """The shared pool; passive background reads (the cache estimate) start here directly, user operations
+        through ``_run_async``. Closing waits for both."""
         if self._closing_requested:
             return
         worker = _Worker(name, operation)
@@ -3335,6 +3637,11 @@ class MainWindow(QMainWindow):
         elif name.startswith("preview:"):
             if name == f"preview:{self._preview_serial}":
                 self.preview.show_message(tr('无法显示这张预览\n') + message)
+        elif name.startswith("disk-estimate:"):
+            # A background estimate never ends another operation or claims the readout.
+            if name == f"disk-estimate:{self._disk_estimate_serial}":
+                self._disk_estimate = {"ok": False, "message": message}
+                self._show_disk_estimate()
         elif name.startswith("reference-build:"):
             self._reference_running = False
             if name == f"reference-build:{self._reference_generation}":
@@ -3510,6 +3817,7 @@ class MainWindow(QMainWindow):
             self._update_controls()
             return
         self.workflow_dir = str(Path(directory).resolve())
+        self._remember_task(result)
         self._reference_cache_epoch += 1
         self._reference_generation += 1
         self._reference_pending = False
@@ -3918,6 +4226,7 @@ class MainWindow(QMainWindow):
         self.timer.stop()
         self._color_timer.stop()
         self._color_finish_timer.stop()
+        self._disk_estimate_timer.stop()
         if self._import_cancel is not None:
             self._import_cancel.set()
         experience = getattr(self, 'experience', None)

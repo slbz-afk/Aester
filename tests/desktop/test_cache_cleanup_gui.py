@@ -161,17 +161,21 @@ def test_cleaning_runs_off_the_ui_thread_while_busy_then_refreshes(make_window, 
     assert '已释放' in page.cache_result.text()
     item = page.cache_jobs.topLevelItem(0)
     assert item.text(5) == '已清理' and item.text(4) == '—'
-    assert not item.flags() & Qt.ItemFlag.ItemIsSelectable and not page.clean_cache_button.isEnabled()
+    # A cleaned job can still be selected and opened, but never cleaned again.
+    item.setSelected(True)
+    assert not page.clean_cache_button.isEnabled() and page.open_cache_job_button.isEnabled()
 
 
-def test_refused_jobs_show_the_reason_and_cannot_be_selected(make_window, app, finished):
+def test_refused_jobs_show_the_reason_and_cannot_be_cleaned(make_window, app, finished):
     (finished['delivery'] / 'final.jpg').write_bytes(b'edited elsewhere')
     window = make_window('en')
     page = open_page(window, app)
     item = page.cache_jobs.topLevelItem(0)
     assert item.text(5).startswith('Cannot clean: ') and 'did not verify' in item.text(5)
     assert not CJK.search(item.text(5)) and item.toolTip(5) == item.text(5)
-    assert not item.flags() & Qt.ItemFlag.ItemIsSelectable
+    item.setSelected(True)                       # selectable to open it, never to clean it
+    assert page._selected_plans() == [] and not page.clean_cache_button.isEnabled()
+    assert page.open_cache_job_button.isEnabled() and page.open_cache_job_button.text() == 'Open this job'
 
 
 @pytest.mark.parametrize('language', ['zh_CN', 'en'])
@@ -200,6 +204,32 @@ def test_trail_review_is_disabled_and_explained_for_a_cleaned_job(make_window, a
 def test_page_texts_have_english():
     for text in (*experience_module.CACHE_COLUMNS, *experience_module.CACHE_STATES.values()):
         assert text in EN and not CJK.search(EN[text]), text
+
+
+@pytest.mark.parametrize('how', ['button', 'double-click'])
+def test_open_this_job_loads_the_selected_task_and_closes_the_page(make_window, app, finished, monkeypatch, how):
+    window = make_window()
+    page = open_page(window, app)
+    opener = page.open_cache_job_button
+    assert opener.text() == '打开此任务' and not opener.isEnabled() and opener.toolTip() == '请在列表中选择一个任务。'
+    loaded = []
+    monkeypatch.setattr(window, 'load_existing_job', lambda path: loaded.append(path))
+    item = page.cache_jobs.topLevelItem(0)
+    item.setSelected(True)
+    assert opener.isEnabled()
+    window.job_state = 'running'                       # never while a job runs
+    window._update_controls()
+    assert not opener.isEnabled()
+    page.open_selected_job()
+    assert loaded == []
+    window.job_state = ''
+    window._update_controls()
+    if how == 'button':
+        opener.click()
+    else:
+        page.cache_jobs.itemDoubleClicked.emit(item, 0)
+    assert loaded == [str(finished['directory'])]
+    assert not window._advanced_dialogs['storage'].isVisible()
 
 
 @pytest.mark.parametrize('language', ['zh_CN', 'en'])
