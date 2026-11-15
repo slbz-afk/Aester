@@ -249,6 +249,23 @@ def test_confirmation_names_the_kept_copies_of_moved_originals(make_window, app,
         assert '有 3 张原片已不在原来的位置' in text and '会保留，不会删除' in text and '不会删除' not in plain
 
 
+@pytest.mark.parametrize('language', ['zh_CN', 'en'])
+def test_confirmation_says_which_selected_jobs_are_skipped(make_window, app, finished, monkeypatch, language):
+    """Rows that cannot be cleaned can be selected (to open them); the confirmation counts them as skipped."""
+    window = make_window(language)
+    page = open_page(window, app)
+    plan = page.cache_jobs.topLevelItem(0).data(0, Qt.ItemDataRole.UserRole)
+    refused = {'workflow_dir': str(finished['directory'].parent / 'workflow-refused'), 'plan_id': None}
+    monkeypatch.setattr(page, '_selected_rows', lambda: [plan, refused, dict(refused)])
+    asked = []
+    monkeypatch.setattr(experience_module, 'ask_cleanup', lambda parent, text: asked.append(text) or False)
+    page.clean_selected_caches()
+    expected = ('所选 3 个任务中有 2 个不能清理，将跳过。' if language == 'zh_CN'
+                else 'Of the 3 selected jobs, 2 cannot be cleaned and will be skipped.')
+    assert len(asked) == 1 and asked[0].endswith('\n\n' + expected)
+    assert expected not in page.cleanup_confirmation([plan], 1) and expected not in page.cleanup_confirmation([plan])
+
+
 def blocking_listing(monkeypatch):
     """list_workflow_caches that waits for ``gate`` on its first call; records each call's roots and cancel state."""
     real, gate, started, calls = cache_cleanup.list_workflow_caches, threading.Event(), threading.Event(), []

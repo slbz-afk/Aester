@@ -752,31 +752,16 @@ EN.update({
     '流星雨合成 · 已打开': 'Meteor shower · on',
     '打开“保留流星等亮迹”，下次启动仍然打开。每段照片出一张图。':
         'Turns on “Preserve meteors and trails” and keeps it on at the next start. Each segment of photos gives one image.',
-    '已打开流星雨合成：流星自动加回，其他亮迹待你复核。下次启动仍然打开。':
-        'Meteor shower is on: meteors are added back automatically; other trails wait for your review. '
-        'It stays on at the next start.',
     '· 照片里有地景时，先在 ① 标记地景。': '· If the photos show foreground, mark it in ① first.',
     '· 每段约 30 分钟、约 150 张，先到为准；每段出一张图。':
         '· Keep each segment to about 30 minutes or about 150 photos, whichever comes first; each segment gives one image.',
     '· 复核完亮迹再清理缓存。': '· Clean the cache only after the trail review is done.',
-    '拍流星雨时用：保留流星，其他亮迹待你复核；每段照片出一张图。':
-        'For meteor showers: meteors are kept, other trails wait for your review; each segment of photos gives one image.',
     '请等当前处理完成后再打开流星雨合成。': 'Wait for the current processing to finish, then turn on Meteor shower.',
     '正在估算所需缓存空间…': 'Estimating the cache space needed…',
     '暂时无法估算所需缓存：': 'Cannot estimate the cache space needed: ',
-    '预计占用缓存约 {0} · 缓存盘可用 {1}': 'Needs about {0} of cache · {1} free on the cache drive',
-    '预计占用缓存约 {0}；读不到缓存盘的可用空间。': 'Needs about {0} of cache; the free space on the cache drive cannot be read.',
-    '空间不够。可分段：每段不超过 {0} 张，分别合成；或在“设置 → 作品与缓存”换到更大的盘。':
-        'Not enough space. Split into segments of at most {0} photos and stack each one, or choose a larger drive '
-        'under Settings → Photographs and cache.',
     '空间不够，这块盘放不下一段。请在“设置 → 作品与缓存”换到更大的盘，或清理已复核的旧任务。':
         'Not enough space: this drive cannot hold even one segment. Choose a larger drive under Settings → '
         'Photographs and cache, or clean old jobs you have finished reviewing.',
-    '长序列建议改用 Siril 官方构建：改进构建需要的缓存约为 {0:.1f} 倍。':
-        'For long sequences, use the official Siril build: the modified build needs about {0:.1f} times the cache.',
-    '长序列建议关闭“保护堆栈高光”：它需要的缓存约为 {0:.1f} 倍。':
-        'For long sequences, turn off “Preserve stacking highlights”: it needs about {0:.1f} times the cache.',
-    '复核亮迹要用这些缓存，复核完再清理。': 'Trail review needs this cache; clean it only after the review.',
     '{0} 张 × 每张 {1}（转换帧 + 配准帧）+ 母版与产物 {2} + 原片副本 {3}':
         '{0} photos × {1} each (converted + registered frame) + masters and products {2} + copies of the originals {3}',
     ' + 范围保护试验副本 {0}': ' + highlight-range trial copies {0}',
@@ -784,10 +769,6 @@ EN.update({
     '读不到首帧尺寸，按原片大小估算：{0} × {1} + 余量 {2}':
         'The first frame size cannot be read, so the estimate uses the file sizes: {0} × {1} + margin {2}',
     '与开始时的空间检查用同一算法：': 'Same calculation as the space check at start: ',
-    '合计 {0} 字节。处理中途写满磁盘会失败。': 'Total {0} bytes. A job fails if the disk fills up while it runs.',
-    '一共 {0} 张，超过每个任务 300 张的上限。请分段处理：每段约 150 张、约 30 分钟，分别添加并合成，每段出一张图。':
-        '{0} photos in total, more than the limit of 300 per job. Process them in segments of about 150 photos '
-        '(about 30 minutes): add and stack each segment separately; each segment gives one image.',
     '{0} · 已用 {1}': '{0} · elapsed {1}',
     '校准镜头畸变': 'Calibrating lens distortion',
     '寻找流星等亮迹': 'Finding meteors and trails',
@@ -812,4 +793,40 @@ EN.update({
         'The previous segment’s photos differ in size or orientation, so its regions cannot be reused; mark them again.',
     '已带入上一段的地景标记；核对边界后点“使用这些分区”。':
         'The previous segment’s foreground marks are in place; check the boundary, then click “Use these regions”.',
+})
+
+# Review fixes: the two-line cache estimate (full advice in its tooltip), the hints for the next segment, and
+# opening a remembered task that has moved.
+EN.update({
+    '已打开流星雨合成：可信的流星自动加回，其他亮迹待你复核。下次启动仍然打开。':
+        'Meteor shower is on: meteors the app is confident about are added back automatically; other trails wait '
+        'for your review. It stays on at the next start.',
+    '拍流星雨时用：可信的流星自动加回，其他亮迹待你复核；每段照片出一张图。':
+        'For meteor showers: meteors the app is confident about are added back automatically, other trails wait '
+        'for your review; each segment of photos gives one image.',
+    '· 下一段先点“清空素材”，再添加新照片。': '· For the next segment, click “Clear all” first, then add the new photos.',
+    '开始需可用约 {0} · 缓存盘可用 {1}': 'Start needs ~{0} free · cache drive has {1}',
+    '开始需可用约 {0} · 读不到可用空间': 'Start needs ~{0} free · free space unknown',
+    '空间不够：每段最多 {0} 张': 'Not enough space: at most {0} photos per segment',
+    '空间不够：每段不超过 {0} 张；复核并清理上一段的缓存后再做下一段，或在“设置 → 作品与缓存”换到更大的盘。':
+        'Not enough space: at most {0} photos per segment. Review and clean the previous segment’s cache before '
+        'the next one, or choose a larger drive under Settings → Photographs and cache.',
+    '空间不够：这块盘放不下一段': 'Not enough space: this drive cannot hold one segment',
+    '长序列建议改用 Siril 官方构建': 'Long sequence: use the official Siril build',
+    '长序列建议在“设置 → 处理后端”改用 Siril 官方构建：开始前要求的可用空间约为官方构建的 {0:.1f} 倍。':
+        'For long sequences, choose the official Siril build under Settings → Processing backends: with the '
+        'modified build, the free space required at start is about {0:.1f} times as much.',
+    '长序列建议关闭“保护堆栈高光”': 'Long sequence: turn off “Preserve stacking highlights”',
+    '长序列建议在“设置 → 处理后端”关闭“保护堆栈高光”：开始前要求的可用空间约为关闭时的 {0:.1f} 倍。':
+        'For long sequences, turn off “Preserve stacking highlights” under Settings → Processing backends: with it '
+        'on, the free space required at start is about {0:.1f} times as much.',
+    '合计 {0} 字节，含安全余量。处理中途写满磁盘会失败。':
+        'Total {0} bytes, including a safety margin. A job fails if the disk fills up while it runs.',
+    '一共 {0} 张，超过每个任务 300 张的上限，请分段处理（拍流星雨建议每段约 150 张、约 30 分钟）；每段出一张图。':
+        '{0} photos in total, more than the limit of 300 per job. Process them in segments (for meteor showers, '
+        'about 150 photos or 30 minutes each); each segment gives one image.',
+    '检查有效覆盖': 'Checking coverage',
+    '找不到这个任务：它可能已移动或删除，或所在的盘没有连接。':
+        'This job cannot be found: it may have been moved or deleted, or its drive is not connected.',
+    '所选 {0} 个任务中有 {1} 个不能清理，将跳过。': 'Of the {0} selected jobs, {1} cannot be cleaned and will be skipped.',
 })

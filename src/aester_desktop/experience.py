@@ -338,8 +338,9 @@ class Experience(QObject):
             text += '\n' + '\n'.join(problem['cache_root'] + ' · ' + translate_message(problem['error']) for problem in problems)
         self.cache_status.setText(text)
 
-    def cleanup_confirmation(self, plans):
-        """The confirmation text: the space freed, what is kept and what is lost."""
+    def cleanup_confirmation(self, plans, selected=None):
+        """The confirmation text: the space freed, what is kept and what is lost (``selected``: how many rows were
+        selected, when some of them cannot be cleaned and are skipped)."""
         freed = sum(plan.get('bytes_deletable') or 0 for plan in plans) / 1024**3
         text = tr('将清理所选 {0} 个任务的中间文件，约释放 {1:.1f} GB。\n\n作品文件夹中的照片和原片都会保留，母版、处理记录和日志也保留。\n清理后这些任务不能再复核亮迹候选，也不能恢复或重做亮迹合成；如需重做，请从原片新建任务。',
                   len(plans), freed)
@@ -348,13 +349,16 @@ class Experience(QObject):
             kept_bytes = sum(plan.get('stage_copies_kept_bytes') or 0 for plan in plans) / 1024**3
             text += '\n\n' + tr('有 {0} 张原片已不在原来的位置或已改变，它们在缓存中的副本（约 {1:.1f} GB）会保留，不会删除。',
                                   kept, kept_bytes)
+        if selected is not None and selected > len(plans):     # rows can be selected to open them, not all cleaned
+            text += '\n\n' + tr('所选 {0} 个任务中有 {1} 个不能清理，将跳过。', selected, selected - len(plans))
         return text
 
     def clean_selected_caches(self):
         if not self._storage_idle():
             return
         plans = self._selected_plans()
-        if not plans or not ask_cleanup(self.window, self.cleanup_confirmation(plans)) or not self._storage_idle():
+        if (not plans or not ask_cleanup(self.window, self.cleanup_confirmation(plans, len(self._selected_rows())))
+                or not self._storage_idle()):
             return
         selected = [(plan['workflow_dir'], plan['plan_id']) for plan in plans]
         self.window._busy = True
@@ -413,7 +417,7 @@ class Experience(QObject):
             return
         w.set_meteor_preset(True)
         self._welcome_done()
-        self.window.message_label.setText(tr('已打开流星雨合成：流星自动加回，其他亮迹待你复核。下次启动仍然打开。'))
+        self.window.message_label.setText(tr('已打开流星雨合成：可信的流星自动加回，其他亮迹待你复核。下次启动仍然打开。'))
 
     def _nox_description(self):
         from starstack.components import nox_install_info
@@ -448,7 +452,7 @@ class Experience(QObject):
             # 「流星雨合成」: the same switch as in the right column (trail keeping on, remembered).
             meteor = QPushButton(tr('流星雨合成')); meteor.setObjectName('welcomeMeteorShower'); meteor.setAutoDefault(False)
             meteor.clicked.connect(self._welcome_meteor); form.addWidget(meteor)
-            form.addWidget(self._label(tr('拍流星雨时用：保留流星，其他亮迹待你复核；每段照片出一张图。'), 'muted'))
+            form.addWidget(self._label(tr('拍流星雨时用：可信的流星自动加回，其他亮迹待你复核；每段照片出一张图。'), 'muted'))
             if getattr(self.window, '_nox_offered', False):
                 form.addWidget(self._label(self._nox_description(), 'muted'))
                 nox = QPushButton(tr('同意并准备可选 nox 组件'))

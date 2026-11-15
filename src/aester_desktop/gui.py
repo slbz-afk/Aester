@@ -17,8 +17,8 @@ from typing import Any, Callable
 # Initialize numerical DLLs on the main thread before QRunnable callbacks import them.
 from astropy.io import fits as _fits
 
-from PySide6.QtCore import (QObject, QRect, QRectF, QRunnable, QSettings, QSignalBlocker, QSize, QStandardPaths, Qt,
-                            QThreadPool, QTimer, QUrl, Signal, Slot)
+from PySide6.QtCore import (QEvent, QObject, QRect, QRectF, QRunnable, QSettings, QSignalBlocker, QSize, QStandardPaths,
+                            Qt, QThreadPool, QTimer, QUrl, Signal, Slot)
 from PySide6.QtGui import (QAction, QActionGroup, QColor, QDesktopServices, QFontDatabase, QIcon, QImage, QImageReader,
                            QPainter, QPen, QPixmap)
 from PySide6.QtWidgets import (
@@ -48,7 +48,7 @@ STAGE_LABELS = {
     "render": "生成成片", "styles": "生成三种风格", "export": "保存结果",
     "done": "已完成", "complete": "已完成",
     # Stages the stack job and the workflow record report (core.py / workflow.py _update calls).
-    "import": "准备素材", "calibrate": "校准镜头畸变", "support": "对齐星空", "compose": "合成天空与地景",
+    "import": "准备素材", "calibrate": "校准镜头畸变", "support": "检查有效覆盖", "compose": "合成天空与地景",
     "transients": "寻找流星等亮迹", "trail_addback": "加回流星", "preflight": "核验素材", "milkyway": "增强银河",
     "resume": "准备继续",
 }
@@ -795,11 +795,20 @@ class MainWindow(QMainWindow):
 
     # ------------------------------------------------------------------ cache space before 「开始合成」
 
+    def _viewing_job(self) -> bool:
+        """A submitted or opened job's own selection is on view (nothing changed since)."""
+        return bool(self.workflow_dir or self.job_dir) and not self._job_detached
+
     def _disk_estimate_inputs(self) -> tuple[tuple[str, ...], str, str | None] | None:
-        """(files, stack mode, cache root) of the job 「开始合成」 would submit now, or None when no new job is
-        being prepared (no photos, a job running, or a submitted job's own selection on view)."""
-        if (not self.input_files or self.job_state in ACTIVE_STATES or self._closing_requested
-                or ((self.workflow_dir or self.job_dir) and not self._job_detached)):
+        """(files, stack mode, cache root) of the job 「开始合成」 would submit now, or None when there is none.
+
+        None while a job runs, with fewer than 3 photos (the start button names that limit itself), or while an
+        unfinished job is on view. A finished job on view counts once 「开始合成」 is possible there (its first-frame
+        preview refreshed): that starts a new job with its own cache (no idempotency key is sent), e.g. after
+        ticking trails that the first run lacked.
+        """
+        if (len(self.input_files) < 3 or self.job_state in ACTIVE_STATES or self._closing_requested
+                or (self._viewing_job() and (self.job_state not in TERMINAL_STATES or not self._orientation_ready()))):
             return None
         from . import disk_space
         mode = disk_space.stack_mode(self.stack_engine_path.text().strip() or None,
@@ -827,27 +836,54 @@ class MainWindow(QMainWindow):
         if force or inputs != self._disk_estimate_key:
             timer.start()
         else:
-            self._show_disk_estimate()               # only the trails note may have changed
+            self._show_disk_estimate()               # e.g. a finished job came into view again
 
-    def _launch_disk_estimate(self) -> None:
+    def _refresh_disk_free(self) -> None:
+        """Read the cache drive's free space again for the estimate on show (space freed or filled elsewhere,
+        e.g. in Explorer); the selection's own figure is kept. Cheap: one ``shutil.disk_usage`` in the pool."""
+        result = getattr(self, "_disk_estimate", None)
+        if (getattr(self, "_disk_estimate_timer", None) is None or not result or not result.get("ok")
+                or self._disk_estimate_timer.isActive() or self._disk_estimate_inputs() != self._disk_estimate_key):
+            return
+        self._launch_disk_estimate(free_only=True)
+
+    def changeEvent(self, event: Any) -> None:  # noqa: N802 - Qt override
+        super().changeEvent(event)
+        if event.type() == QEvent.Type.ActivationChange and self.isActiveWindow() and not self._closing_requested:
+            self._refresh_disk_free()
+
+    def _launch_disk_estimate(self, *, free_only: bool = False) -> None:
         inputs = self._disk_estimate_inputs()
         if inputs is None or self._closing_requested:
             return
         from . import disk_space
+        previous, previous_key = self._disk_estimate, self._disk_estimate_key
         self._disk_estimate_key = inputs
         self._disk_estimate_serial += 1
         serial = self._disk_estimate_serial
         files, mode, root = inputs
-        if self._disk_estimate is None:
-            self.disk_estimate_label.setText(tr('正在估算所需缓存空间…'))
-            self.disk_estimate_label.setToolTip("")
-            self.disk_estimate_label.show()
+        if free_only and previous and previous.get("ok") and previous_key == inputs:
+            def compute() -> dict[str, Any]:
+                try:
+                    free = disk_space.free_bytes(root) if root else None
+                except OSError:
+                    free = None
+                need = int(previous["record"]["required_bytes"])
+                return {**previous, "free_bytes": free, "fits": None if free is None else free >= need}
+        else:
+            if previous is None or previous_key != inputs:
+                # Another selection or mode: the previous figure is not this one's.
+                self._disk_estimate = None
+                self.disk_estimate_label.setText(tr('正在估算所需缓存空间…'))
+                self.disk_estimate_label.setToolTip("")
+                themes.set_role(self.disk_estimate_label, "hint")
+                self.disk_estimate_label.show()
 
-        def compute() -> dict[str, Any]:
-            try:
-                return {"ok": True, **disk_space.job_estimate(list(files), mode, root)}
-            except Exception as error:                 # an unreadable file: say so, never block the window
-                return {"ok": False, "message": str(error) or type(error).__name__}
+            def compute() -> dict[str, Any]:
+                try:
+                    return {"ok": True, **disk_space.job_estimate(list(files), mode, root)}
+                except Exception as error:                 # an unreadable file: say so, never block the window
+                    return {"ok": False, "message": str(error) or type(error).__name__}
 
         def computed(result: dict[str, Any]) -> None:
             if serial != self._disk_estimate_serial:
@@ -862,36 +898,61 @@ class MainWindow(QMainWindow):
         its number when the line wraps)."""
         return f"{value / 1e9:.1f}\u00a0GB"
 
+    def _estimate_line_width(self) -> int:
+        """The width one line of the estimate has in the fixed bottom of the step column (the panel is fixed)."""
+        panel = self.disk_estimate_label.parentWidget()
+        margins = panel.layout().contentsMargins() if panel is not None and panel.layout() is not None else None
+        return max(120, panel.width() - margins.left() - margins.right()) if margins is not None else 240
+
     def _show_disk_estimate(self) -> None:
+        """At most two short lines beside 「开始合成」 (the figures, then one status), so the step column keeps
+        its room on small screens; the advice in full and the calculation are in the tooltip."""
         label = self.disk_estimate_label
         result = self._disk_estimate
         if result is None:
             return
         if not result.get("ok"):
-            label.setText(tr('暂时无法估算所需缓存：') + translate_message(result.get("message") or ""))
-            label.setToolTip("")
+            if self._viewing_job():
+                label.clear()                       # an old job's photos moved away: nothing to say while viewing
+                label.hide()
+                return
+            prefix, reason = tr('暂时无法估算所需缓存：'), translate_message(result.get("message") or "")
+            room = self._estimate_line_width() - label.fontMetrics().horizontalAdvance(prefix)
+            # One line: a long reason (often a path) is shortened in the middle; all of it is in the tooltip.
+            label.setText(prefix + label.fontMetrics().elidedText(reason, Qt.TextElideMode.ElideMiddle, max(40, room)))
+            label.setToolTip(prefix + reason)
             themes.set_role(label, "hint")
             label.show()
             return
         from . import disk_space
         record, free = result["record"], result["free_bytes"]
         need = int(record["required_bytes"])
-        lines = [tr('预计占用缓存约 {0} · 缓存盘可用 {1}', self._gigabytes(need), self._gigabytes(free))
-                 if free is not None else tr('预计占用缓存约 {0}；读不到缓存盘的可用空间。', self._gigabytes(need))]
+        # The admission requirement (with its safety margin), not the expected use: 「开始」 needs this much free.
+        lines = [tr('开始需可用约 {0} · 缓存盘可用 {1}', self._gigabytes(need), self._gigabytes(free))
+                 if free is not None else tr('开始需可用约 {0} · 读不到可用空间', self._gigabytes(need))]
+        advice = []
         short = free is not None and free < need
         if short:
             frames = disk_space.fitting_frames(record, free)
-            lines.append(tr('空间不够。可分段：每段不超过 {0} 张，分别合成；或在“设置 → 作品与缓存”换到更大的盘。', frames)
-                         if frames >= 3 else
-                         tr('空间不够，这块盘放不下一段。请在“设置 → 作品与缓存”换到更大的盘，或清理已复核的旧任务。'))
+            if frames >= 3:
+                lines.append(tr('空间不够：每段最多 {0} 张', frames))
+                advice.append(tr('空间不够：每段不超过 {0} 张；复核并清理上一段的缓存后再做下一段，'
+                                 '或在“设置 → 作品与缓存”换到更大的盘。', frames))
+            else:
+                lines.append(tr('空间不够：这块盘放不下一段'))
+                advice.append(tr('空间不够，这块盘放不下一段。请在“设置 → 作品与缓存”换到更大的盘，或清理已复核的旧任务。'))
         mode = record.get("stack_range_mode")
         if mode != disk_space.LEGACY and int(record["frames"]) >= disk_space.LONG_SEQUENCE and result["legacy_required"]:
+            # Both figures are admission requirements (it counts every highlight-range attempt); real use differs.
             ratio = need / result["legacy_required"]
-            lines.append(tr('长序列建议改用 Siril 官方构建：改进构建需要的缓存约为 {0:.1f} 倍。', ratio)
-                         if mode == disk_space.FINITE else
-                         tr('长序列建议关闭“保护堆栈高光”：它需要的缓存约为 {0:.1f} 倍。', ratio))
-        if self.trails_enabled.isChecked() and not self._meteor_preset:   # the preset's hints already say it
-            lines.append(tr('复核亮迹要用这些缓存，复核完再清理。'))
+            if mode == disk_space.FINITE:
+                status = tr('长序列建议改用 Siril 官方构建')
+                advice.append(tr('长序列建议在“设置 → 处理后端”改用 Siril 官方构建：开始前要求的可用空间约为官方构建的 {0:.1f} 倍。', ratio))
+            else:
+                status = tr('长序列建议关闭“保护堆栈高光”')
+                advice.append(tr('长序列建议在“设置 → 处理后端”关闭“保护堆栈高光”：开始前要求的可用空间约为关闭时的 {0:.1f} 倍。', ratio))
+            if not short:
+                lines.append(status)
         label.setText("\n".join(lines))
         if record.get("basis") == "frames_x_frame_volume":
             detail = tr('{0} 张 × 每张 {1}（转换帧 + 配准帧）+ 母版与产物 {2} + 原片副本 {3}',
@@ -904,8 +965,8 @@ class MainWindow(QMainWindow):
             detail = tr('读不到首帧尺寸，按原片大小估算：{0} × {1} + 余量 {2}',
                         self._gigabytes(record["source_bytes"]), record["legacy_factor"],
                         self._gigabytes(record["margin_bytes"]))
-        label.setToolTip(tr('与开始时的空间检查用同一算法：') + detail + "\n"
-                         + tr('合计 {0} 字节。处理中途写满磁盘会失败。', f"{need:,}"))
+        label.setToolTip("\n".join([*advice, tr('与开始时的空间检查用同一算法：') + detail,
+                                    tr('合计 {0} 字节，含安全余量。处理中途写满磁盘会失败。', f"{need:,}")]))
         themes.set_role(label, "error" if short else "hint")
         label.show()
 
@@ -1653,11 +1714,6 @@ class MainWindow(QMainWindow):
         a job loaded for viewing never writes this preference.
         """
         self._meteor_preset = bool(on)
-        if self.meteor_preset_button.isChecked() != self._meteor_preset:
-            with QSignalBlocker(self.meteor_preset_button):
-                self.meteor_preset_button.setChecked(self._meteor_preset)
-        # The state in words as well as in the checked style: a second click turns it off.
-        self.meteor_preset_button.setText(tr('流星雨合成 · 已打开') if self._meteor_preset else tr('流星雨合成'))
         if self._meteor_preset and not self.trails_enabled.isChecked():
             self.trails_enabled.setChecked(True)
         elif not self._meteor_preset and persist and self.trails_enabled.isChecked():
@@ -1667,12 +1723,29 @@ class MainWindow(QMainWindow):
             settings.setValue(METEOR_PRESET_KEY, self._meteor_preset)
             settings.sync()
         self._update_meteor_hints()
-        self._schedule_disk_estimate()          # its review-cache note moves into the hints and back
+
+    def _meteor_preset_active(self) -> bool:
+        """What 「开始合成」 would send now: the mode is on and trails are ticked (an opened job or editing project
+        without trails unticks the box but keeps the saved mode)."""
+        return self._meteor_preset and self.trails_enabled.isChecked()
+
+    def _sync_meteor_button(self) -> None:
+        """The button shows what will be sent, in words as well as in the checked style."""
+        button = getattr(self, "meteor_preset_button", None)
+        if button is None:
+            return
+        active = self._meteor_preset_active()
+        if button.isChecked() != active:
+            with QSignalBlocker(button):
+                button.setChecked(active)
+        button.setText(tr('流星雨合成 · 已打开') if active else tr('流星雨合成'))
 
     def _meteor_preset_clicked(self, on: bool) -> None:
+        """A click on the shown state: off → on (also when the mode is saved but an opened job unticked trails,
+        which ticks trails and keeps the mode); on → off."""
         self.set_meteor_preset(on)
         if on:
-            self.message_label.setText(tr('已打开流星雨合成：流星自动加回，其他亮迹待你复核。下次启动仍然打开。'))
+            self.message_label.setText(tr('已打开流星雨合成：可信的流星自动加回，其他亮迹待你复核。下次启动仍然打开。'))
 
     def _trails_toggled(self, on: bool) -> None:
         """Unticking 保留流星等亮迹 by hand ends meteor-shower mode; a loaded job's value never does."""
@@ -1680,18 +1753,22 @@ class MainWindow(QMainWindow):
             self.set_meteor_preset(False)
         else:
             self._update_meteor_hints()
-        self._schedule_disk_estimate()
 
     def _update_meteor_hints(self) -> None:
+        """The hints under the trails box: the meteor-shower ones in that mode, and the review-cache one whenever
+        trails are kept."""
+        self._sync_meteor_button()
         label = getattr(self, "meteor_hints", None)
         if label is None:
             return
-        shown = self._meteor_preset and self.trails_enabled.isChecked()
+        shown = self.trails_enabled.isChecked()
         if shown:
             lines = []
-            if self._scene_from_current_marks() != 'landscape':
-                lines.append(tr('· 照片里有地景时，先在 ① 标记地景。'))
-            lines.append(tr('· 每段约 30 分钟、约 150 张，先到为准；每段出一张图。'))
+            if self._meteor_preset:
+                if self._scene_from_current_marks() != 'landscape':
+                    lines.append(tr('· 照片里有地景时，先在 ① 标记地景。'))
+                lines.append(tr('· 每段约 30 分钟、约 150 张，先到为准；每段出一张图。'))
+                lines.append(tr('· 下一段先点“清空素材”，再添加新照片。'))
             lines.append(tr('· 复核完亮迹再清理缓存。'))
             label.setText("\n".join(lines))
         label.setVisible(shown)
@@ -2296,8 +2373,9 @@ class MainWindow(QMainWindow):
             return
         if len(self.input_files) + len(added) > 300:
             # The engine refuses more than 300 frames per job; a meteor night is processed in segments.
-            self.message_label.setText(tr('一共 {0} 张，超过每个任务 300 张的上限。请分段处理：每段约 150 张、约 30 分钟，'
-                                          '分别添加并合成，每段出一张图。', len(self.input_files) + len(added)))
+            self.message_label.setText(tr('一共 {0} 张，超过每个任务 300 张的上限，请分段处理'
+                                          '（拍流星雨建议每段约 150 张、约 30 分钟）；每段出一张图。',
+                                          len(self.input_files) + len(added)))
             return
         selected = [self._import_originals.get(p, p) for p in self.input_files] + added
         if any(Path(p).suffix.lower() in RAW - {'.dng'} for p in selected):
@@ -2612,26 +2690,35 @@ class MainWindow(QMainWindow):
         return text + (tr(' · 含亮迹') if entry.get("trails") is True else "")
 
     def _fill_recent_menu(self) -> None:
+        """Every remembered task, from the stored labels only: no folder is looked at while the menu opens (a cache
+        on a disconnected drive or network share would freeze it). A chosen task is checked when it is opened."""
         menu = self.recent_menu
         menu.clear()
         idle = not self._busy and self.job_state not in ACTIVE_STATES and not self._closing_requested
-        shown = 0
-        for entry in self.recent_tasks():
+        entries = self.recent_tasks()
+        for entry in entries:
             path = entry["path"]
-            if not (Path(path) / "workflow.json").is_file():
-                continue                       # moved or deleted: not offered
             item = menu.addAction(self._recent_label(entry))
             item.setToolTip(path)
             item.setEnabled(idle)
-            item.triggered.connect(lambda checked=False, chosen=path: self.load_existing_job(chosen))
-            shown += 1
-        if not shown:
+            item.triggered.connect(lambda checked=False, chosen=path: self.open_recent_task(chosen))
+        if not entries:
             empty = menu.addAction(tr('还没有最近的任务'))
             empty.setEnabled(False)
         menu.addSeparator()
         clear = menu.addAction(tr('清空列表'))
-        clear.setEnabled(bool(self.recent_tasks()))
+        clear.setEnabled(bool(entries))
         clear.triggered.connect(self.clear_recent_tasks)
+
+    def open_recent_task(self, path: str) -> None:
+        """Open a remembered task; one that has moved, was deleted or sits on a drive that is not connected is
+        named as such and kept in the list (the drive may come back; 清空列表 forgets it)."""
+        if self._busy or self.job_state in ACTIVE_STATES:
+            return
+        if not (Path(path) / "workflow.json").is_file():
+            self.message_label.setText(tr('找不到这个任务：它可能已移动或删除，或所在的盘没有连接。'))
+            return
+        self.load_existing_job(path)
 
     def clear_recent_tasks(self) -> None:
         """Forget the list only; no task or file is touched."""
@@ -3663,7 +3750,12 @@ class MainWindow(QMainWindow):
 
     def _start_worker(self, name: str, operation: Callable[[], Any], callback: Callable[[Any], None]) -> None:
         """The shared pool; passive background reads (the cache estimate) start here directly, user operations
-        through ``_run_async``. Closing waits for both."""
+        through ``_run_async``. Closing waits for both.
+
+        So a test that replaces ``_run_async`` to forbid or record dispatch does not see the cache estimate: it is
+        debounced by ``_disk_estimate_timer`` (250 ms), never runs while a job is active (``_disk_estimate_inputs``
+        returns None), and catches its own errors. tests/desktop/test_meteor_shower_entry.py covers it directly.
+        """
         if self._closing_requested:
             return
         worker = _Worker(name, operation)

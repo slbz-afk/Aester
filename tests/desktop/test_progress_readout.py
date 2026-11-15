@@ -24,7 +24,9 @@ def _running(tmp_path, stage, *, seconds=75, attempt=1):
 
 @pytest.mark.parametrize("language,child,expected", [
     ("zh_CN", "transients", "寻找流星等亮迹"), ("zh_CN", "convert", "读取图像"), ("zh_CN", "calibrate", "校准镜头畸变"),
-    ("en", "transients", "Finding meteors and trails"), ("en", "compose", "Combining sky and foreground")])
+    ("zh_CN", "support", "检查有效覆盖"),        # the strict-support check, not a second "aligning"
+    ("en", "transients", "Finding meteors and trails"), ("en", "compose", "Combining sky and foreground"),
+    ("en", "support", "Checking coverage")])
 def test_stage_name_comes_from_the_stack_job_with_elapsed_time(make, app, tmp_path, monkeypatch, language, child,
                                                                expected):
     window, _ = make(language)
