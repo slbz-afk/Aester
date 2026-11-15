@@ -2,7 +2,7 @@
 import sys
 from unittest.mock import Mock
 
-from PySide6.QtWidgets import QPushButton
+from PySide6.QtWidgets import QLabel, QPushButton
 
 from starstack import components
 from test_gui_workflow import app, window
@@ -26,6 +26,7 @@ def test_welcome_explains_optional_source_and_later_does_nothing(window, monkeyp
     queue = queue_workers(window, monkeypatch)
     install = Mock(side_effect=AssertionError('no consent'))
     monkeypatch.setattr(components, 'install_nox_support', install)
+    window._nox_offered = True  # a build whose manifest publishes the nox download
     experience = window.experience
     experience.show_welcome()
     text = experience._nox_description()
@@ -41,6 +42,7 @@ def test_welcome_consent_waits_for_status_then_starts_one_install(window, monkey
     queue = queue_workers(window, monkeypatch)
     install = Mock(return_value={'ready': False, 'error': 'download address not published', 'components': []})
     monkeypatch.setattr(components, 'install_nox_support', install)
+    window._nox_offered = True  # a build whose manifest publishes the nox download
     experience = window.experience
     experience.show_welcome()
     window._advanced_dialogs['welcome'].findChild(QPushButton, 'welcomeNoxConsent').click()
@@ -128,3 +130,66 @@ def test_chosen_existing_model_is_passed_only_after_explicit_prepare(window, mon
     queue[-1][2](queue[-1][1]())
     assert install.call_args.kwargs['model_source'] == 'existing/model.onnx'
     assert install.call_args.kwargs['consent'] is True
+
+
+def test_this_builds_manifest_offers_no_nox_download():
+    from aester_desktop import gui
+    assert components.nox_install_info()['available'] is False
+    assert gui.nox_download_offered() is False
+
+
+def test_unreadable_nox_configuration_counts_as_not_offered(monkeypatch):
+    from aester_desktop import gui
+    def broken():
+        raise ValueError('manifest unreadable')
+    monkeypatch.setattr(components, 'nox_install_info', broken)
+    assert gui.nox_download_offered() is False
+    monkeypatch.setattr(components, 'nox_install_info', lambda: {'available': True})
+    assert gui.nox_download_offered() is True
+
+
+def test_welcome_without_nox_download_shows_one_line_and_no_dead_button(window, monkeypatch):
+    queue = queue_workers(window, monkeypatch)
+    install = Mock(side_effect=AssertionError('no consent possible'))
+    monkeypatch.setattr(components, 'install_nox_support', install)
+    window._nox_offered = False
+    window.experience.show_welcome()
+    dialog = window._advanced_dialogs['welcome']
+    assert dialog.findChild(QPushButton, 'welcomeNoxConsent') is None
+    assert dialog.findChild(QPushButton, 'welcomeNoxLater') is None
+    note = dialog.findChild(QLabel, 'welcomeNoxUnavailable')
+    assert note is not None and note.isVisible() and '暂不可用' in note.text()
+    # The other ways forward stay: start directly, or choose a verified model under the components.
+    assert dialog.findChild(QPushButton, 'primary').isVisible()
+    assert not queue
+    install.assert_not_called()
+
+
+def test_stars_off_without_download_or_model_but_a_chosen_model_enables_it(window):
+    window._nox_offered = False
+    window.star_model_path.setText('')
+    window._update_controls()
+    assert not window.stars_enabled.isEnabled() and not window.stars_enabled.isChecked()
+    assert window.stars_unavailable_note.isVisible() and '暂不可用' in window.stars_unavailable_note.text()
+    assert '处理后端' in window.stars_enabled.toolTip()
+    window.star_model_path.setText('verified/nox_color.onnx')  # a user-supplied verified model still works
+    assert window.stars_enabled.isEnabled()
+    assert not window.stars_unavailable_note.isVisible() and window.stars_enabled.toolTip() == ''
+    window.star_model_path.setText('')
+    assert not window.stars_enabled.isEnabled() and window.stars_unavailable_note.isVisible()
+
+
+def test_a_box_ticked_by_an_older_project_can_still_be_cleared(window):
+    window._nox_offered = False
+    window.star_model_path.setText('')
+    window.stars_enabled.setChecked(True)
+    assert window.stars_enabled.isEnabled() and window.stars_unavailable_note.isVisible()
+    window.stars_enabled.setChecked(False)
+    assert not window.stars_enabled.isEnabled()
+
+
+def test_build_with_nox_download_keeps_the_box_available(window):
+    window._nox_offered = True
+    window.star_model_path.setText('')
+    window._update_controls()
+    assert window.stars_enabled.isEnabled() and not window.stars_unavailable_note.isVisible()

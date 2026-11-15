@@ -414,12 +414,18 @@ class Experience(QObject):
             form.addWidget(self._label(tr('你可以直接操作，也可以让已经配置的大模型助手通过 MCP 操作。连接助手是可选的，不需要在 Aester 填入模型密钥。'), 'muted'))
             begin = QPushButton(tr('直接开始')); begin.setObjectName('primary'); themes.set_role(begin, 'primary')
             begin.clicked.connect(self._welcome_done); form.addWidget(begin)
-            form.addWidget(self._label(self._nox_description(), 'muted'))
-            nox = QPushButton(tr('同意并准备可选 nox 组件'))
-            nox.setObjectName('welcomeNoxConsent'); nox.setAutoDefault(False)
-            nox.clicked.connect(self._welcome_nox); form.addWidget(nox)
-            later = QPushButton(tr('稍后再说'))
-            later.setObjectName('welcomeNoxLater'); later.clicked.connect(self._welcome_done); form.addWidget(later)
+            if getattr(self.window, '_nox_offered', False):
+                form.addWidget(self._label(self._nox_description(), 'muted'))
+                nox = QPushButton(tr('同意并准备可选 nox 组件'))
+                nox.setObjectName('welcomeNoxConsent'); nox.setAutoDefault(False)
+                nox.clicked.connect(self._welcome_nox); form.addWidget(nox)
+                later = QPushButton(tr('稍后再说'))
+                later.setObjectName('welcomeNoxLater'); later.clicked.connect(self._welcome_done); form.addWidget(later)
+            else:
+                # No nox download in this build: no consent button that cannot work, only one line.
+                # A verified model the user already has can still be chosen under 查看已安装组件.
+                unavailable = self._label(tr('整理星点（去星、缩星）在此版本暂不可用：nox 模型的训练数据权利还在核查，暂不提供下载。'), 'muted')
+                unavailable.setObjectName('welcomeNoxUnavailable'); form.addWidget(unavailable)
             connect = QPushButton(tr('连接 AI 助手')); connect.clicked.connect(lambda:(self._welcome_done(),self.show_connection())); form.addWidget(connect)
             component = QPushButton(tr('查看已安装组件')); component.clicked.connect(self.show_components); form.addWidget(component)
             form.addWidget(self._label(tr('深色、浅色与夜视可在“设置 → 外观”切换。作品与缓存位置可在设置里查看。'), 'hint'))

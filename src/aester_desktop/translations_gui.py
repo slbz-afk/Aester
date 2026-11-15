@@ -16,6 +16,15 @@ EN = {
         'The download configuration is not available. You can select an existing verified converted model in Components.',
     '同意并准备可选 nox 组件': 'Agree and prepare optional nox support',
     '稍后再说': 'Later',
+    '整理星点（去星、缩星）在此版本暂不可用：nox 模型的训练数据权利还在核查，暂不提供下载。':
+        'Reduce stars (star removal and reduction) is not available in this version: the rights to the nox '
+        "model's training data are still being checked, so it is not offered for download.",
+    '此版本不提供去星模型，整理星点暂不可用。':
+        'This version offers no star-removal model, so Reduce stars is not available.',
+    'nox 模型的训练数据权利还在核查，此版本不提供下载。已有本项目核验的转换模型时，可在“设置 → 处理后端”选择。':
+        "The rights to the nox model's training data are still being checked, so this version does not offer it "
+        'for download. If you already have a model converted and verified by this project, choose it in '
+        'Settings → Processing backends.',
     '同意准备 nox 模型与运行环境（可选）': 'I agree to prepare the nox model and runtime (optional)',
     '取消准备': 'Cancel preparation',
     '组件有独立版本和校验记录。nox 在主动同意后准备；可稍后重试或选择已有的本项目转换模型，不会更改原片或作品。':
