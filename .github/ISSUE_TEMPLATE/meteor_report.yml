@@ -1,0 +1,122 @@
+name: 流星雨出图回执
+description: 用 Aester 处理了一场流星雨（例如双子座）后，告诉我们结果，好的坏的都欢迎
+title: "[流星雨出图回执] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        谢谢你用 Aester 处理流星雨。这份回执帮我们了解它在真实拍摄中好不好用，每一项都可以写个大概。
+
+        **请不要在这里上传 RAW 原片。** issue 是公开的，任何人都能下载；照片里还可能带有 GPS 位置和机身序列号。如果你愿意提供素材，在最后一栏说一声，传送方式和使用范围另行私下约定。
+
+        不用 GitHub 的话，也可以把同样的内容发邮件到 aester-star-stacker@outlook.com。
+  - type: input
+    id: version
+    attributes:
+      label: Aester 版本
+      description: 帮助 → 关于 Aester，或安装包文件名
+      placeholder: 1.0.0-rc.1
+    validations:
+      required: true
+  - type: input
+    id: camera_lens
+    attributes:
+      label: 相机和镜头
+      placeholder: Nikon Z 8，14-24mm f/2.8 用 14mm
+    validations:
+      required: true
+  - type: input
+    id: raw_format
+    attributes:
+      label: RAW 格式
+      description: 文件类型和压缩方式，例如 NEF 无损压缩、CR3、ARW 未压缩、Nikon HE★；用 Adobe DNG Converter 转过的请注明
+    validations:
+      required: true
+  - type: input
+    id: night
+    attributes:
+      label: 拍摄的夜晚
+      placeholder: 2026-12-13 至 14 日夜
+    validations:
+      required: true
+  - type: input
+    id: place
+    attributes:
+      label: 大致地点
+      description: 写到省或城市即可，不需要具体位置
+  - type: input
+    id: frames_total
+    attributes:
+      label: 一共拍了多少张
+    validations:
+      required: true
+  - type: input
+    id: segments
+    attributes:
+      label: 分了几段处理
+      description: Aester 每个任务最多 300 张，更长的连拍要分段
+    validations:
+      required: true
+  - type: input
+    id: frames_per_segment
+    attributes:
+      label: 每段多少张
+      placeholder: 150 / 150 / 120
+    validations:
+      required: true
+  - type: input
+    id: time_per_segment
+    attributes:
+      label: 每段处理用时
+      description: 从点“开始合成”到完成，每段大约几分钟
+      placeholder: 25 / 24 / 20 分钟
+    validations:
+      required: true
+  - type: input
+    id: computer
+    attributes:
+      label: 电脑
+      description: 内存大小；缓存所在的磁盘类型、容量和处理前的空闲空间；处理器（可选）
+      placeholder: 16 GB 内存；缓存在 1 TB NVMe SSD，空闲 400 GB；Ryzen 9 6900HX
+    validations:
+      required: true
+  - type: input
+    id: auto_kept
+    attributes:
+      label: 自动加回了几条
+      description: 成片下方说明行里“已加回 N 条（算法 a …）”的算法那一项；分段的写每段
+    validations:
+      required: true
+  - type: input
+    id: auto_kept_wrong
+    attributes:
+      label: 自动加回的里面，有几条其实不是流星
+      description: 例如卫星、飞机或别的亮迹；没细看就写“没看”
+  - type: input
+    id: kept_after_review
+    attributes:
+      label: 复核后最终加回了几条
+      description: 没有复核就写“没复核”
+  - type: input
+    id: not_added
+    attributes:
+      label: 最终没有加回的有几条
+      description: 包括你复核后决定不加回的，以及没看的“待核实”候选；写个大概即可
+  - type: input
+    id: review_minutes
+    attributes:
+      label: 复核用了多少分钟
+  - type: dropdown
+    id: satisfied
+    attributes:
+      label: 得到满意的合成图了吗
+      options:
+        - 是
+        - 否
+    validations:
+      required: true
+  - type: textarea
+    id: problems
+    attributes:
+      label: 遇到的问题
+      description: 安装、处理、复核、出图中的任何问题都可以写。出错时请附窗口底部“详情”里的消息。愿意提供素材的也在这里说一声，不要上传原片。
