@@ -16,10 +16,10 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushB
                               QComboBox, QTreeWidget, QTreeWidgetItem, QSplitter, QCheckBox,
                               QWidget, QAbstractItemView, QMessageBox, QGridLayout, QButtonGroup,
                               QStyledItemDelegate, QStyleOptionViewItem, QStyle, QApplication,
-                              QScrollArea, QFrame, QFileDialog, QMenu)
+                              QScrollArea, QFrame, QFileDialog, QMenu, QLayout)
 
 from starstack import overlay_colors as oc
-from . import themes
+from . import themes, trail_manifest
 from starstack import trail_review_session as service
 from starstack.i18n import get_language, tr, translate_message
 from .region_canvas import NightFrameCache, cased, is_night, night_display, red_only, shown_color
@@ -52,6 +52,82 @@ def _button(text, role=None):
     if role:
         themes.set_role(button, role)
     return button
+
+
+class _FlowRow(QLayout):
+    """Widgets in a row that wraps onto a second line when the dialog is narrower than the row, so the
+    row never sets the dialog's minimum width (longer English labels included)."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._items = []
+        self.setContentsMargins(0, 0, 0, 0)
+
+    def addItem(self, item):  # noqa: N802 - Qt override
+        self._items.append(item)
+
+    def count(self):
+        return len(self._items)
+
+    def itemAt(self, index):  # noqa: N802 - Qt override
+        return self._items[index] if 0 <= index < len(self._items) else None
+
+    def takeAt(self, index):  # noqa: N802 - Qt override
+        return self._items.pop(index) if 0 <= index < len(self._items) else None
+
+    def expandingDirections(self):  # noqa: N802 - Qt override
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self):  # noqa: N802 - Qt override
+        return True
+
+    def heightForWidth(self, width):  # noqa: N802 - Qt override
+        return self._place(QRect(0, 0, width, 0), apply=False)
+
+    def setGeometry(self, rect):  # noqa: N802 - Qt override
+        super().setGeometry(rect)
+        self._place(rect, apply=True)
+
+    def sizeHint(self):  # noqa: N802 - Qt override
+        shown = [item.sizeHint() for item in self._items if not item.isEmpty()]
+        width = sum(hint.width() for hint in shown) + self._gap() * max(0, len(shown) - 1)
+        return QSize(width, max((hint.height() for hint in shown), default=0))
+
+    def minimumSize(self):  # noqa: N802 - Qt override
+        size = QSize(0, 0)
+        for item in self._items:
+            if not item.isEmpty():
+                size = size.expandedTo(item.minimumSize())
+        return size
+
+    def _gap(self):
+        return self.spacing() if self.spacing() >= 0 else 6
+
+    def _place(self, rect, apply):
+        """Lay the items out left to right, wrapping at ``rect``'s width; returns the height used."""
+        gap = self._gap()
+        lines, line, used = [], [], 0
+        for item in self._items:
+            if item.isEmpty():
+                continue
+            hint = item.sizeHint()
+            if line and used + gap + hint.width() > rect.width():
+                lines.append(line)
+                line, used = [], 0
+            used += (gap if line else 0) + hint.width()
+            line.append((item, hint))
+        if line:
+            lines.append(line)
+        y = rect.y()
+        for number, line in enumerate(lines):
+            height = max(hint.height() for _, hint in line)
+            x = rect.x()
+            for item, hint in line:
+                if apply:     # each item centred in its line's height
+                    item.setGeometry(QRect(x, y + (height - hint.height()) // 2, hint.width(), hint.height()))
+                x += hint.width() + gap
+            y += height + (gap if number < len(lines) - 1 else 0)
+        return y - rect.y()
 
 
 def ask_save(parent):
@@ -180,6 +256,24 @@ def _source_text(kind):
     return {"human": tr('人工确定'), "agent": tr('Agent 确定')}.get(kind, tr('算法'))
 
 
+def action_text(action) -> str:
+    """A keep / omit choice in the interface language: 保留 / 不加回; English Keep / Omit (the 不加回
+    filter and legend read 'Not added back' there)."""
+    if action == "omit":
+        return tr('不加回（选择）') if get_language() == "en" else ACTIONS["omit"]
+    return tr(ACTIONS.get(action, str(action)))
+
+
+def record_text(text) -> str:
+    """Wording from the engine's record, for display. English goes through translate_message; the Chinese
+    interface says 不加回 where older records say 省略. The record keeps its own words."""
+    text = str(text or "")
+    if get_language() == "en":
+        return translate_message(text)
+    from .translations_dialogs import ZH_PLAIN_RECORD_WORDS
+    return ZH_PLAIN_RECORD_WORDS.get(text, text)
+
+
 def _file_name(path) -> str:
     """The last part of a Windows or POSIX path."""
     return re.split(r"[\\/]", str(path))[-1] if path else ""
@@ -203,11 +297,29 @@ def _finite(value):
     return float(value)
 
 
+# The scan's date_obs is the frame's FITS DATE-OBS in UT (for camera RAW, Siril converts the camera's clock
+# with the processing computer's time zone). The list shows it in this computer's zone, which gives back
+# the camera clock when both use the same zone. None: this computer's zone (tests set a fixed one).
+LOCAL_ZONE = None
+
+
 def capture_clock(date_obs) -> str:
-    """'20:22:06' from the camera's '2026-08-12T20:22:06' (time zone unknown); '' when absent."""
-    text = str(date_obs or "")
-    match = re.search(r"T(\d{1,2}:\d{2}(?::\d{2})?)", text)
-    return match.group(1) if match else text
+    """'04:22:06' (local time) from the UT '2026-08-12T20:22:06'; the text as written when unreadable."""
+    local = trail_manifest.capture_time(date_obs, LOCAL_ZONE)
+    return local.strftime("%H:%M:%S") if local is not None else str(date_obs or "")
+
+
+def capture_tooltip(date_obs) -> str:
+    local = trail_manifest.capture_time(date_obs, LOCAL_ZONE)
+    if local is None:
+        return str(date_obs or "")
+    return tr('{0}（这台电脑的时区 {1}）\n记录的世界时：{2}', local.strftime("%Y-%m-%d %H:%M:%S"),
+              trail_manifest.utc_offset(local), str(date_obs))
+
+
+def _time_key(date_obs):
+    local = trail_manifest.capture_time(date_obs)
+    return local.timestamp() if local is not None else None
 
 
 @functools.lru_cache(maxsize=1)
@@ -251,7 +363,7 @@ def _sort_keys(candidate):
     priority = review_priority(candidate)
     return {COL_ID: (candidate.get("frame_index") or 0, int(number) if number.isdigit() else 0),
             COL_PRIORITY: None if priority is None else _PRIORITY_RANK[priority],
-            COL_TIME: str(candidate["date_obs"]) if candidate.get("date_obs") else None,
+            COL_TIME: _time_key(candidate.get("date_obs")),
             COL_SNR: _finite(candidate.get("total_snr")), COL_LENGTH: _finite(candidate.get("length_px"))}
 
 
@@ -924,11 +1036,13 @@ class TrailReviewDialog(QDialog):
     """
     applyRequested = Signal(str)
 
-    def __init__(self, session: dict, parent=None, *, workflow: dict | None = None):
+    def __init__(self, session: dict, parent=None, *, workflow: dict | None = None, originals: dict | None = None):
         super().__init__(parent)
         self.session = copy.deepcopy(session)
         # The workflow record (read only): which candidates its published trails version added back.
         self.workflow = copy.deepcopy(workflow) if isinstance(workflow, dict) else None
+        # Original photographs behind DNG working copies made in this session (trail_manifest.import_sources).
+        self.originals = dict(originals or {})
         self.decisions = copy.deepcopy(session.get("decisions") or {})
         self._undo = []
         self._workers = []
@@ -962,11 +1076,11 @@ class TrailReviewDialog(QDialog):
         self.split = split = QSplitter(Qt.Orientation.Horizontal)
         self.list = _CandidateTree()
         self.list.setHeaderLabels([tr('候选 / 曝光'), tr('身份'), tr('是否加回'), tr('本次选择'),
-                                   tr('优先级'), tr('时间'), tr('亮度'), tr('长度')])
-        header_tips = {COL_ID: tr('点击按拍摄顺序排列。'),
-                       COL_PRIORITY: tr('先看哪些的提示，不是可信度。自动不加回的候选里，端点渐隐、碰到画框边或测量到边界的为“高”。已加回或已有明确选择的显示“—”。'),
-                       COL_TIME: tr('相机记下的拍摄时刻，时区未知。'),
-                       COL_SNR: tr('沿轨迹的总信噪比（S/N），越大越亮。'),
+                                   tr('优先级'), tr('时间'), tr('信噪比'), tr('长度')])
+        header_tips = {COL_ID: tr('点击按帧序号（加入照片的顺序）排列。'),
+                       COL_PRIORITY: tr('先看哪些的提示，不是可信度。自动不加回的候选里，端点渐隐、碰到画框边或测量到边界的为“高”；已请求保留但未能测量的也为“高”。已加回或此前已明确选择的显示“—”；本窗口里的新选择应用后才更新。'),
+                       COL_TIME: tr('拍摄时刻，按这台电脑的时区显示。相机和电脑设在同一时区时就是相机上的时间；不同时会差整小时。'),
+                       COL_SNR: tr('沿轨迹的总信噪比（S/N），可当亮度参考：越大越明显；轨迹越长也越大，不等于亮度。'),
                        COL_LENGTH: tr('测量出的长度（像素）。')}
         for column, tip in header_tips.items():
             self.list.headerItem().setToolTip(column, tip)
@@ -990,7 +1104,7 @@ class TrailReviewDialog(QDialog):
             item.setToolTip(0, candidate["id"] + "\n" + str(candidate.get("input") or "") +
                             (tr('\n未能测量定位，不能把“不加回”视为已排除流星') if candidate.get("status") != "measured" else ""))
             if candidate.get("date_obs"):
-                item.setToolTip(COL_TIME, tr('{0}（相机时间，时区未知）', candidate["date_obs"]))
+                item.setToolTip(COL_TIME, capture_tooltip(candidate["date_obs"]))
             for column in (COL_SNR, COL_LENGTH):
                 item.setTextAlignment(column, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self._items[candidate["id"]] = item
@@ -1006,7 +1120,7 @@ class TrailReviewDialog(QDialog):
         split.setCollapsible(0, False)
         split.splitterMoved.connect(self._splitter_moved)
         layout.addWidget(split, 1)
-        controls = QHBoxLayout()
+        controls = _FlowRow()       # wraps on narrow screens instead of widening the dialog
         self.next_button = _button(tr('下一条待复核'))
         self.next_button.setToolTip(tr('跳到列表中下一条还没有选择的候选（回车）。'))
         self.next_button.clicked.connect(self.next_to_review)
@@ -1018,7 +1132,8 @@ class TrailReviewDialog(QDialog):
         self.label_choice.addItem(tr('清除已有人工身份'), None)
         self.action_choice = QComboBox()
         reset = tr('恢复默认（按身份）') if self._meteor_default() else tr('恢复默认（不加回）')
-        for text, value in ((tr('是否加回：保持原样'), "unchanged"), (tr('保留'), "keep"), (tr('不加回'), "omit"), (reset, None)):
+        for text, value in ((tr('是否加回：保持原样'), "unchanged"), (action_text("keep"), "keep"),
+                            (action_text("omit"), "omit"), (reset, None)):
             self.action_choice.addItem(text, value)
         controls.addWidget(self.label_choice)
         controls.addWidget(self.action_choice)
@@ -1043,7 +1158,6 @@ class TrailReviewDialog(QDialog):
         self.bulk_omit_action.triggered.connect(lambda: self.bulk_choice("omit"))
         self.bulk_button.setMenu(bulk)
         controls.addWidget(self.bulk_button)
-        controls.addStretch(1)
         layout.addLayout(controls)
         footer = QHBoxLayout()
         self.status_icon = ErrorIcon(16, accessible_name=tr('错误'))
@@ -1098,14 +1212,25 @@ class TrailReviewDialog(QDialog):
 
     # -- layout pieces --
 
-    def _fit_to_screen(self, parent):
-        """Size the dialog to the screen's free area (1280 x 720 laptops included) and centre it there."""
+    def _screen_area(self, parent=None):
         screen = parent.screen() if parent is not None else None
-        screen = screen or QApplication.primaryScreen()
-        area = screen.availableGeometry() if screen is not None else QRect(0, 0, 1280, 720)
+        screen = screen or self.screen() or QApplication.primaryScreen()
+        return screen.availableGeometry() if screen is not None else QRect(0, 0, 1280, 720)
+
+    def _fit_to_screen(self, parent):
+        """Size the dialog to the screen's free area (1280 x 720 laptops included) and centre it there.
+
+        Called before the layout exists and again when first shown, when the style and fonts are final:
+        never below the layout's minimum (that would only push the dialog off the screen's right edge).
+        """
+        area = self._screen_area(parent)
+        minimum = QSize(0, 0)
+        if self.layout() is not None:
+            self.layout().activate()      # the minimum set before the style was applied may be stale
+            minimum = self.minimumSizeHint()
         # Room for the window frame and title bar inside the free area.
-        width = max(640, min(1500, area.width() - 24))
-        height = max(480, min(940, area.height() - 48))
+        width = max(minimum.width(), 640, min(1500, area.width() - 24))
+        height = max(minimum.height(), 480, min(940, area.height() - 48))
         self.resize(width, height)
         self.move(area.x() + max(0, (area.width() - width) // 2), area.y() + max(0, (area.height() - height - 32) // 2))
 
@@ -1113,6 +1238,7 @@ class TrailReviewDialog(QDialog):
         super().showEvent(event)
         if not self._sized:      # sizes set before the first layout are only proportions; fonts are final now
             self._sized = True
+            self._fit_to_screen(self.parentWidget())
             self._fit_columns()
             self._initial_sizes()
 
@@ -1182,9 +1308,14 @@ class TrailReviewDialog(QDialog):
         themes.set_role(self.filter_count, 'hint')
         second.addWidget(self.filter_count)
         second.addStretch(1)
-        keys = QLabel(tr('K 保留 · O 不加回 · U 恢复默认 · 回车 下一条'))
+        # Two lines on laptop screens, broken only between whole keys (never inside 恢复默认).
+        pairs = (tr('K 保留'), tr('O 不加回'), tr('U 恢复默认'), tr('回车 下一条'))
+        joined = [pair.replace(" ", "\u00a0") for pair in pairs]
+        text = " · ".join(joined) if self.width() >= 1400 else " · ".join(joined[:2]) + "\n" + " · ".join(joined[2:])
+        keys = QLabel(text)
         keys.setToolTip(tr('快捷键作用于选中的候选；焦点在列表或预览上时可用。'))
-        keys.setWordWrap(self.width() < 1400)     # never widens the dialog past a laptop screen
+        keys.setWordWrap(False)
+        self.keys_hint = keys
         keys.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         themes.set_role(keys, 'hint')
         second.addWidget(keys)
@@ -1447,14 +1578,17 @@ class TrailReviewDialog(QDialog):
     def _recorded_disposition(self, candidate):
         """The disposition before any draft choice, as text in the interface language."""
         if not self._meteor_default():
-            return translate_message(candidate.get("review_disposition", ACTIONS.get(candidate.get("decision"), '待定')))
+            if candidate.get("review_disposition"):
+                return record_text(candidate["review_disposition"])
+            decision = candidate.get("decision")
+            return action_text(decision) if decision in ACTIONS else tr('待定')
         state = candidate_state(candidate, meteor_default=True, layered=self._layered(candidate["id"]))
         return tr(disposition_text(state, True))
 
     def _disposition(self, candidate, state):
         decision = self.decisions.get(candidate["id"]) or {}
         if not self._meteor_default() and "override" not in decision and candidate.get("review_disposition"):
-            return translate_message(candidate["review_disposition"])
+            return record_text(candidate["review_disposition"])
         return tr(disposition_text(state, self._meteor_default()))
 
     def _show_revision(self, candidate_id):
@@ -1466,7 +1600,7 @@ class TrailReviewDialog(QDialog):
                                tr(LABELS.get(decision["label"], '清除身份')))
         if "override" in decision:
             if decision["override"] in ACTIONS:
-                new = tr(ACTIONS[decision["override"]])
+                new = action_text(decision["override"])
             elif self._meteor_default():
                 new = tr(disposition_text(self.candidate_state(candidate_id), True))
             else:
@@ -1591,7 +1725,7 @@ class TrailReviewDialog(QDialog):
             if not self.decisions.get(cid) and not self._states[cid]["revised"]:
                 self.select_candidate(cid)
                 return True
-        self.status.setText(tr('当前筛选下的候选都已有选择。'))
+        self.status.setText(tr('当前筛选下的候选都已有选择。') if self.shown_order() else tr('当前筛选下没有候选。'))
         return False
 
     # -- sorting ---------------------------------------------------------------------------------
@@ -1677,9 +1811,11 @@ class TrailReviewDialog(QDialog):
         return [cid for cid, item in self._items.items() if not item.isHidden()]
 
     def _apply_filter(self):
-        shown = set()
+        shown, matching = set(), 0
         for cid, item in self._items.items():
-            visible = cid in self._pinned or self._matches(cid)
+            matches = self._matches(cid)
+            matching += matches
+            visible = matches or cid in self._pinned
             if visible:
                 shown.add(cid)
             if item.isHidden() == visible:
@@ -1688,7 +1824,8 @@ class TrailReviewDialog(QDialog):
                 item.setSelected(False)
         self.location.set_visible(None if len(shown) == len(self._items) else shown)
         self.filter_count.setText(tr('显示 {0} / {1} 条', len(shown), len(self._items)) if self._items else "")
-        self.bulk_button.setEnabled(self._filtering() and bool(shown))
+        # Pinned rows (just changed, no longer in the filter) are shown but never set in one step.
+        self.bulk_button.setEnabled(self._filtering() and matching > 0)
         current = self.list.currentItem()
         if current is not None and current.isHidden():
             order = self.shown_order()
@@ -1754,7 +1891,7 @@ class TrailReviewDialog(QDialog):
                 parts.append(tr(LABELS.get(decision["label"], '清除身份')))
             if "override" in decision:
                 reset = tr('恢复默认') if meteor_default else tr('默认不加回')
-                parts.append(tr(ACTIONS[decision["override"]]) if decision["override"] in ACTIONS else reset)
+                parts.append(action_text(decision["override"]) if decision["override"] in ACTIONS else reset)
             item.setText(3, " / ".join(parts))
         self.location.set_styles(styles)
         self._update_filter_buttons()
@@ -1801,23 +1938,29 @@ class TrailReviewDialog(QDialog):
         self._refresh_decisions()
 
     def bulk_choice(self, action, confirm=None):
-        """Keep or omit every row the current filter shows, after asking; one undo step restores it."""
-        ids = self.shown_order()
+        """Keep or omit every row that matches the current filter, after asking; one undo step restores it.
+
+        Rows changed a moment ago that no longer match stay shown (pinned) but are left as they are.
+        """
+        shown = self.shown_order()
+        ids = [cid for cid in shown if self._matches(cid)]
         if not self._filtering() or not ids:
             self.status.setText(tr('先选一个筛选，再对筛选结果整批设置。'))
             return False
-        if not (confirm or self._confirm_bulk)(action, len(ids)):
+        if not (confirm or self._confirm_bulk)(action, len(ids), len(shown) - len(ids)):
             return False
         self._choose(ids, "unchanged", action)
-        self.status.setText(tr('已把当前筛选的 {0} 条设为“{1}”；“撤销上一步”可恢复。', len(ids), tr(ACTIONS[action])))
+        self.status.setText(tr('已把当前筛选的 {0} 条设为“{1}”；“撤销上一步”可恢复。', len(ids), action_text(action)))
         return True
 
-    def _confirm_bulk(self, action, count):
+    def _confirm_bulk(self, action, count, left_out=0):
         buttons = QMessageBox.StandardButton
         if action == "keep":
             text = tr('把当前筛选的 {0} 条全部设为保留？\n没看过的候选里可能有飞机或卫星，保留后会加进含亮迹版本。“撤销上一步”可恢复。', count)
         else:
             text = tr('把当前筛选的 {0} 条全部设为不加回？\n“撤销上一步”可恢复。', count)
+        if left_out:
+            text += tr('\n另有 {0} 条刚改过、已不在此筛选，不会改动。', left_out)
         box = QMessageBox(themes.message_icon(self), tr('整批设置'), text, buttons.Ok | buttons.Cancel, self)
         box.button(buttons.Ok).setText(tr('全部保留') if action == "keep" else tr('全部不加回'))
         box.button(buttons.Cancel).setText(tr('取消'))
@@ -1868,23 +2011,23 @@ class TrailReviewDialog(QDialog):
     # -- composite list ------------------------------------------------------------------------
 
     def _update_export_button(self):
-        from . import trail_manifest
         available = trail_manifest.published_keeps(self.session, self.workflow) is not None
         self.export_button.setEnabled(available)
         self.export_button.setToolTip(
             tr('把含亮迹版本加回的每条流星（来自哪张原片、拍摄时刻、位置）存成 CSV 和 JSON，保存在你选的位置。')
             if available else tr('这次复核还没有对应的含亮迹版本，暂时不能导出合成清单。'))
 
-    def export_manifest(self, path=None):
+    def export_manifest(self, path=None, confirm_overwrite=None):
         """Write the composite list of the published trails version as CSV + JSON; returns their paths or None.
 
         Read only: the list describes what was added back to the delivered photograph, not unapplied
-        draft choices. ``path`` None asks where to save; the works folder is refused.
+        draft choices. ``path`` None asks where to save; the works folder is refused. The file dialog asks
+        before replacing the CSV; an existing JSON beside it is replaced only after asking too.
         """
         from starstack.core import load_job
-        from . import trail_manifest
         try:
-            manifest = trail_manifest.build(self.session, load_job(self.session["job_dir"]), self.workflow)
+            manifest = trail_manifest.build(self.session, load_job(self.session["job_dir"]), self.workflow,
+                                            originals=self.originals, zone=LOCAL_ZONE)
         except Exception as exc:
             self._set_status_error(True)
             self.status.setText(translate_message(str(exc)))
@@ -1900,6 +2043,9 @@ class TrailReviewDialog(QDialog):
             self._set_status_error(True)
             self.status.setText(tr('作品文件夹只放成片图像，请把清单存到别处。'))
             return None
+        json_path = trail_manifest.paths(path)[1]
+        if json_path.exists() and not (confirm_overwrite or self._confirm_overwrite)(json_path.name):
+            return None
         try:
             written = trail_manifest.write(manifest, path)
         except OSError as exc:
@@ -1911,6 +2057,17 @@ class TrailReviewDialog(QDialog):
         self.status.setText(tr('已导出合成清单：加回 {0} 条。\n{1}\n{2}', len(manifest["rows"]), *written) +
                             (tr('\n清单按已出图的版本；本窗口里还没应用的选择不在其中。') if pending else ""))
         return written
+
+    def _confirm_overwrite(self, name):
+        buttons = QMessageBox.StandardButton
+        box = QMessageBox(themes.message_icon(self), tr('导出合成清单'),
+                          tr('旁边已有同名的 {0}，导出时会一起替换。替换吗？', name), buttons.Ok | buttons.Cancel, self)
+        box.button(buttons.Ok).setText(tr('替换'))
+        box.button(buttons.Cancel).setText(tr('取消'))
+        box.setDefaultButton(buttons.Cancel)
+        box.setEscapeButton(buttons.Cancel)
+        box.exec()
+        return box.clickedButton() is box.button(buttons.Ok)
 
     def _current_changed(self, item, previous=None):
         if item is None:
@@ -1926,7 +2083,7 @@ class TrailReviewDialog(QDialog):
         self.summary.setText(tr("{0} · {1}\n已记录身份：{2}；是否加回：{3}。 ",
                              cid, _file_name(candidate.get('input')),
                              tr(LABELS[self._recorded_identity(candidate)]),
-                             self._recorded_disposition(candidate)) + translate_message(review.get("message") or ""))
+                             self._recorded_disposition(candidate)) + record_text(review.get("message") or ""))
         self.summary.setToolTip(str(candidate.get('input') or ''))
         reasons = [suggestion_text(r) for r in ((candidate.get("suggestion") or {}).get("reasons") or [])]
         self.reasons.setText(tr('算法建议：{0}', tr(LABELS[suggested_identity(candidate)])) +

@@ -421,6 +421,9 @@ class MainWindow(QMainWindow):
         self._regions_saved_by_user: dict[str, Any] | None = None  # identity of the last editor save
         self.input_files: list[str] = []
         self._import_originals: dict[str, str] = {}
+        # Every RAW-to-DNG conversion of this session (stacked DNG -> original name and hashes), kept across
+        # selections so a composite list can name the photographs the user shot.
+        self._import_sources: dict[str, dict] = {}
         self._import_cancel = None
         self._finite_backend_info = {}
         self._reference_generation = 0
@@ -2156,6 +2159,8 @@ class MainWindow(QMainWindow):
             self._import_cancel = None
             self.input_files = list(result['input_files'])
             self._import_originals = dict(zip(result['input_files'], result['originals']))
+            from aester_desktop.trail_manifest import import_sources
+            self._import_sources.update(import_sources(result))
             self._selection_changed()
             if result['converted']:
                 self.message_label.setText(tr('已导入 DNG 兼容副本；原 RAW 保持原位，来源记录保存在缓存。'))
@@ -2436,7 +2441,7 @@ class MainWindow(QMainWindow):
             self._update_controls()
             if self.workflow_dir != directory:
                 return
-            dialog = TrailReviewDialog(session, self, workflow=self._workflow)
+            dialog = TrailReviewDialog(session, self, workflow=self._workflow, originals=self._import_sources)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self.message_label.setText(tr('亮迹复核已关闭；已保存草稿可继续编辑。'))
                 return

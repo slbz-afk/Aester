@@ -159,22 +159,27 @@ EN.update({
 # Trail review triage (2026-11): priority and keep filters, sortable columns, keys, side panel, composite list.
 EN.update({
     '高': 'High', '一般': 'Normal', '低': 'Low', '优先级': 'Priority', '加回': 'Added back',
-    '时间': 'Time', '亮度': 'Brightness', '长度': 'Length',
-    '点击按拍摄顺序排列。': 'Click to sort by capture order.',
-    '先看哪些的提示，不是可信度。自动不加回的候选里，端点渐隐、碰到画框边或测量到边界的为“高”。已加回或已有明确选择的显示“—”。':
-        'A hint for what to look at first, not a confidence. Among candidates not added back automatically, those with a fading end, an end at the frame edge or a measurement at its limit are High. Candidates already added back or with an explicit choice show “—”.',
+    '时间': 'Time', '信噪比': 'S/N', '长度': 'Length',
+    '点击按帧序号（加入照片的顺序）排列。': 'Click to sort by frame number (the order the photos were added).',
+    '先看哪些的提示，不是可信度。自动不加回的候选里，端点渐隐、碰到画框边或测量到边界的为“高”；已请求保留但未能测量的也为“高”。已加回或此前已明确选择的显示“—”；本窗口里的新选择应用后才更新。':
+        'A hint for what to look at first, not a confidence. Among candidates not added back automatically, those with a fading end, an end at the frame edge or a measurement at its limit are High; so are keep requests that could not be measured. Candidates already added back or chosen earlier show “—”; choices made in this window update it after they are applied.',
     '复核优先级只是先看哪些的提示，不是可信度。': 'Review priority is a hint for what to look at first, not a confidence.',
-    '相机记下的拍摄时刻，时区未知。': 'Capture time recorded by the camera; the time zone is unknown.',
-    '{0}（相机时间，时区未知）': '{0} (camera clock, time zone unknown)',
-    '沿轨迹的总信噪比（S/N），越大越亮。': 'Total signal-to-noise ratio (S/N) along the trail; higher is brighter.',
+    '拍摄时刻，按这台电脑的时区显示。相机和电脑设在同一时区时就是相机上的时间；不同时会差整小时。':
+        'Capture time in this computer’s time zone. It matches the camera clock when the camera and this computer use the same zone; otherwise it is off by whole hours.',
+    '{0}（这台电脑的时区 {1}）\n记录的世界时：{2}': '{0} (this computer’s time zone, {1})\nRecorded UT: {2}',
+    '沿轨迹的总信噪比（S/N），可当亮度参考：越大越明显；轨迹越长也越大，不等于亮度。':
+        'Total S/N along the trail, a rough guide to brightness: higher means more distinct; it also grows with length, so it is not brightness.',
     '测量出的长度（像素）。': 'Measured length in pixels.',
     '下一条待复核': 'Next to review',
     '跳到列表中下一条还没有选择的候选（回车）。': 'Go to the next candidate in the list without a choice yet (Enter).',
-    'K 保留 · O 不加回 · U 恢复默认 · 回车 下一条': 'K keep · O do not add back · U reset · Enter next',
+    'K 保留': 'K keep', 'O 不加回': 'O omit', 'U 恢复默认': 'U reset', '回车 下一条': 'Enter next',
+    '不加回（选择）': 'Omit',
     '快捷键作用于选中的候选；焦点在列表或预览上时可用。':
         'Shortcuts act on the selected candidates while the list or the preview has focus.',
     '先选择候选。': 'Select candidates first.',
     '当前筛选下的候选都已有选择。': 'Every candidate in this filter already has a choice.',
+    '旁边已有同名的 {0}，导出时会一起替换。替换吗？': '{0} already exists beside it and would be replaced too. Replace it?',
+    '替换': 'Replace',
     '详情': 'Details',
     '显示或收起右侧的缩略图、邻帧对照与改判记录。':
         'Show or hide the side panel with the thumbnail, neighbouring exposures and revisions.',
@@ -196,35 +201,40 @@ EN.update({
         'No version with trails matches the current candidate record, so no composite list can be exported.',
     '加回记录里的候选不在当前复核数据中，不能导出合成清单。':
         'A candidate in the add-back record is missing from the review data, so no composite list can be exported.',
-    '拍摄时刻是相机记下的时间，时区未知，不一定是北京时间或世界时。':
-        'Capture times are the camera clock; the time zone is unknown and may be neither local time nor UTC.',
+    '拍摄时刻：capture_time_utc 是世界时，capture_time_local 按这台电脑的时区换算。相机 RAW 的世界时由 Siril 按处理时电脑的时区从相机时间换算，所以相机和电脑设在同一时区时，本地时刻就是相机上的时间；相机设在别的时区时会差整小时。':
+        'Capture times: capture_time_utc is UT, and capture_time_local converts it to this computer’s time zone. For camera RAW, Siril derives UT from the camera clock with the processing computer’s time zone, so the local time is the camera clock when the camera and the computer use the same zone; with the camera set to another zone it is off by whole hours.',
     '含亮迹版本里的线性母版（master_scene_linear.tif）不含流星；流星只加在成片（final_srgb16.tif、final.jpg）里。':
         'The linear master in the version with trails (master_scene_linear.tif) contains no meteors; meteors are added only to the photographs (final_srgb16.tif, final.jpg).',
     '身份是算法建议或复核者的选择，不是认证；同一张曝光的一颗流星可能有多条候选。':
         'Identities are algorithm suggestions or reviewer choices, not certification; one meteor in one exposure may appear as several candidates.',
     '未扫描的帧（质量门剔除或未能对齐）里即使有流星，也不在本清单中。':
         'Frames that were not scanned (excluded by the quality gate or not aligned) are not covered, even if they hold meteors.',
-    '单张曝光时长不在复核数据里，各行暂不填写；本段合计见 exposure。':
-        'Single-exposure times are not in the review data, so the rows leave them empty; see exposure for the segment totals.',
+    '单张曝光时长不在复核数据里；exposure 只有本段合计。':
+        'Single-exposure times are not in the review data; exposure gives only the segment totals.',
+    '若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（这次没有可用的转换记录）。':
+        'If camera RAW files were converted to DNG working copies when they were added, the list names the working copies: each original has the same name stem and a different hash (no conversion record from this session was available).',
 })
 
 # Keep or omit everything the current filter shows (2026-11).
 EN.update({
     '当前筛选全部…': 'Everything in filter…',
     '对当前筛选显示的全部候选一次设为保留或不加回；先选一个筛选。':
-        'Keep, or do not add back, every candidate the current filter shows. Choose a filter first.',
-    '全部保留…': 'Keep all…', '全部不加回…': 'Add none back…',
-    '全部保留': 'Keep all', '全部不加回': 'Add none back', '整批设置': 'Set in one step',
+        'Keep or omit every candidate the current filter shows. Choose a filter first.',
+    '全部保留…': 'Keep all…', '全部不加回…': 'Omit all…',
+    '全部保留': 'Keep all', '全部不加回': 'Omit all', '整批设置': 'Set in one step',
     '先选一个筛选，再对筛选结果整批设置。': 'Choose a filter first, then set everything it shows.',
     '已把当前筛选的 {0} 条设为“{1}”；“撤销上一步”可恢复。':
         'Set {0} candidates in this filter to “{1}”. Undo last change restores them.',
     '把当前筛选的 {0} 条全部设为保留？\n没看过的候选里可能有飞机或卫星，保留后会加进含亮迹版本。“撤销上一步”可恢复。':
         'Keep all {0} candidates in this filter?\nCandidates you have not looked at may be aircraft or satellites; kept ones are added to the version with trails. Undo last change restores them.',
     '把当前筛选的 {0} 条全部设为不加回？\n“撤销上一步”可恢复。':
-        'Add none of the {0} candidates in this filter back?\nUndo last change restores them.',
+        'Omit all {0} candidates in this filter?\nUndo last change restores them.',
+    '\n另有 {0} 条刚改过、已不在此筛选，不会改动。':
+        '\n{0} more you just changed no longer match this filter and stay as they are.',
 })
 
-# Plainer review wording (2026-11): 不加回 for 省略, 是否加回 for 处置; the English is unchanged.
+# Plainer review wording (2026-11): 不加回 for 省略, 是否加回 for 处置. English keeps Keep / Omit for the
+# choices and says Added back / Not added back for the filters and the legend.
 EN.update({
     '选中一条或多条亮迹，分别决定身份与是否保留。测量可靠的流星默认保留（空心圈＝算法）；其他身份默认不加回，明确选择“保留”才会加回。改判后列表与右侧预览立即更新，朱点表示你的改判。\n未知不等于卫星；自动不加回不代表已排除流星。先保存草稿，最后一次应用全部选择；保留限于已测量范围。':
         'Select trails and choose identity and keep/omit decisions separately. Meteors with a reliable measurement are kept by default (hollow ring = algorithm); other identities are omitted unless you choose Keep. The list and the preview update as soon as you revise a trail; a red dot marks your revision.\nUnknown does not mean satellite, and automatic omission does not rule out a meteor. Save a draft, then apply all choices. Preservation covers only the measured extent.',
@@ -291,3 +301,13 @@ ZH_REASON_VALUES = {
 ZH_REASON_LEVEL = "（峰值的 {value}）"
 ZH_REASON_FRAME = "第{number}张"
 ZH_REASON_LIST_SEPARATOR = "、"
+
+# Engine record words shown in the Chinese interface (display only; records keep their words): older
+# records and the recall review say 省略 where the dialog says 不加回.
+ZH_PLAIN_RECORD_WORDS = {
+    '默认省略': '默认不加回',
+    '明确省略': '明确不加回',
+    '已自动省略，但身份尚未核实，不能视为已排除流星。': '已自动不加回，但身份尚未核实，不能视为已排除流星。',
+    '候选未能测量而被省略，不能据此确认原片没有流星。': '候选未能测量，没有加回；不能据此确认原片没有流星。',
+    '已有明确人工标签或省略处置；这记录了取舍，不认证物理身份。': '已有明确人工标签或不加回的选择；这记录了取舍，不认证物理身份。',
+}
