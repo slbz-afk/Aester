@@ -528,11 +528,11 @@ def test_meteor_workflow_session_and_trails_preview(job_directory):
     assert review.read_review(session["session_path"])["preview_path"] != str((works / "trails" / "final.jpg").resolve())
 
 
-# ---- B5 (2026-11-16): scan thumbnails in the review view. The scan writes review_png but never
-# review_png_sha256, so the view shows the job's own work/transients/crops file, marked unverified.
-UNVERIFIED_NOTE = "扫描缩略图未经内容校验，仅供浏览；判断请以下方经过校验的实际曝光对照为准"
-MISSING_NOTE = "候选缩略图缺失；请使用下方经过校验的实际曝光对照"
-LEGACY_NOTE = "旧候选缩略图没有内容校验；请使用下方经过校验的实际曝光对照"
+# ---- Scan thumbnails in the review view (no review_png_sha256 is recorded by the scan) ----
+# The view shows the job's own work/transients/crops file, marked unverified.
+UNVERIFIED_NOTE = "扫描时生成的缩略图，未核对文件此后是否被改动，仅供浏览；判断请以经过校验的实际曝光对照为准"
+MISSING_NOTE = "候选缩略图缺失；请使用经过校验的实际曝光对照"
+NOT_IN_SCAN_FOLDER_NOTE = "此候选缩略图不在扫描缩略图文件夹中，未显示；请使用经过校验的实际曝光对照"
 
 
 def with_thumbnails(directory, paths, hashes=None):
@@ -577,8 +577,11 @@ def test_scan_thumbnail_without_hash_is_shown_and_marked_unverified(job_director
     assert review.read_review(session["session_path"])["candidates"][0]["review_png"] == str(png.resolve())
     assert fingerprint(record, png, job_directory / "job.json") == before          # view only: nothing rewritten
     from starstack.i18n import translate_message
-    assert translate_message(UNVERIFIED_NOTE, "en").startswith("The scan thumbnail has no content verification")
+    assert translate_message(UNVERIFIED_NOTE, "en").startswith("Thumbnail made during the scan; the file was not checked")
     assert translate_message(MISSING_NOTE, "en").startswith("The candidate thumbnail is missing")
+    assert translate_message(NOT_IN_SCAN_FOLDER_NOTE, "en").startswith("This candidate thumbnail is not in the scan thumbnail folder")
+    for note in (UNVERIFIED_NOTE, MISSING_NOTE, NOT_IN_SCAN_FOLDER_NOTE):
+        assert "下方" not in note and "below" not in translate_message(note, "en")  # MCP replies have no "below"
 
 
 def test_scan_thumbnail_without_hash_and_missing_file_is_not_shown(job_directory):
@@ -590,16 +593,32 @@ def test_scan_thumbnail_without_hash_and_missing_file_is_not_shown(job_directory
     assert not png.parent.exists()                                                 # the view creates nothing
 
 
+def test_scan_thumbnail_missing_from_an_existing_crops_folder_is_not_shown(job_directory):
+    crop(job_directory, "light_00002-1.png")                                       # the folder exists, with another crop
+    png = job_directory / "work" / "transients" / "crops" / "light_00001-1.png"   # recorded, never written
+    with_thumbnails(job_directory, {"light_00001-1": png})
+    view = review.open_review(str(job_directory))["candidates"][0]
+    assert png.parent.is_dir() and not png.exists()
+    assert view["review_png"] is None and view["preview_note"] == MISSING_NOTE
+
+
+def test_thumbnail_naming_the_crops_folder_itself_gets_the_missing_note(job_directory):
+    folder = crop(job_directory, "light_00002-1.png").parent
+    with_thumbnails(job_directory, {"light_00001-1": folder})
+    view = review.open_review(str(job_directory))["candidates"][0]
+    assert view["review_png"] is None and view["preview_note"] == MISSING_NOTE
+
+
 def test_unhashed_thumbnail_elsewhere_in_the_job_stays_hidden(job_directory):
-    # A file inside the job but outside work/transients/crops (here: the master, and a crop folder of an
-    # export) is not shown without a hash; the record keeps its path.
+    # A file inside the job but outside work/transients/crops (here: the master, and the crop folder of an
+    # export, where a manual mark's crops are written) is not shown without a hash; the record keeps its path.
     other = job_directory / "products" / "revision1" / "transients" / "crops" / "light_00002-1.png"
     other.parent.mkdir(parents=True)
     other.write_bytes((job_directory / "work" / "sky_master.fit").read_bytes())
     with_thumbnails(job_directory, {"light_00001-1": job_directory / "work" / "sky_master.fit", "light_00002-1": other})
     session = review.open_review(str(job_directory))
     for view in session["candidates"]:
-        assert view["review_png"] is None and view["preview_note"] == LEGACY_NOTE
+        assert view["review_png"] is None and view["preview_note"] == NOT_IN_SCAN_FOLDER_NOTE
 
 
 @pytest.mark.parametrize("escape", ["outside", "dotdot"])
