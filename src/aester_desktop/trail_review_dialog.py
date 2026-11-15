@@ -1044,13 +1044,17 @@ class TrailReviewDialog(QDialog):
     """
     applyRequested = Signal(str)
 
-    def __init__(self, session: dict, parent=None, *, workflow: dict | None = None, originals: dict | None = None):
+    def __init__(self, session: dict, parent=None, *, workflow: dict | None = None, originals: dict | None = None,
+                 cache_root: str | None = None):
         super().__init__(parent)
         self.session = copy.deepcopy(session)
         # The workflow record (read only): which candidates its published trails version added back.
         self.workflow = copy.deepcopy(workflow) if isinstance(workflow, dict) else None
         # Original photographs behind DNG working copies made in this session (trail_manifest.import_sources).
         self.originals = dict(originals or {})
+        # The main window's cache folder: the composite list looks up the import records there for stacked
+        # inputs this session did not convert (trail_manifest.with_cache_records). None: no lookup.
+        self.cache_root = cache_root
         self.decisions = copy.deepcopy(session.get("decisions") or {})
         self._undo = []
         self._workers = []
@@ -2034,8 +2038,9 @@ class TrailReviewDialog(QDialog):
         """
         from starstack.core import load_job
         try:
-            manifest = trail_manifest.build(self.session, load_job(self.session["job_dir"]), self.workflow,
-                                            originals=self.originals, zone=LOCAL_ZONE)
+            job = load_job(self.session["job_dir"])
+            originals = trail_manifest.with_cache_records(job, self.originals, self.cache_root)
+            manifest = trail_manifest.build(self.session, job, self.workflow, originals=originals, zone=LOCAL_ZONE)
         except Exception as exc:
             self._set_status_error(True)
             self.status.setText(translate_message(str(exc)))

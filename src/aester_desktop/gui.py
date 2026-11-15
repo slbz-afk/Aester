@@ -432,7 +432,8 @@ class MainWindow(QMainWindow):
         self.input_files: list[str] = []
         self._import_originals: dict[str, str] = {}
         # Every RAW-to-DNG conversion of this session (stacked DNG -> original name and hashes), kept across
-        # selections so a composite list can name the photographs the user shot.
+        # selections so a composite list can name the photographs the user shot. After a restart the list
+        # finds earlier sessions' records in the cache folder instead (trail_manifest.with_cache_records).
         self._import_sources: dict[str, dict] = {}
         self._import_cancel = None
         self._finite_backend_info = {}
@@ -2838,7 +2839,12 @@ class MainWindow(QMainWindow):
             self._update_controls()
             if self.workflow_dir != directory:
                 return
-            dialog = TrailReviewDialog(session, self, workflow=self._workflow, originals=self._import_sources)
+            try:
+                cache_root = self._processing_root()   # where the import records of earlier sessions are
+            except ValueError:
+                cache_root = None
+            dialog = TrailReviewDialog(session, self, workflow=self._workflow, originals=self._import_sources,
+                                       cache_root=cache_root)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self.message_label.setText(tr('亮迹复核已关闭；已保存草稿可继续编辑。'))
                 return

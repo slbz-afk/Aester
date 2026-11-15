@@ -211,8 +211,8 @@ EN.update({
         'Frames that were not scanned (excluded by the quality gate or not aligned) are not covered, even if they hold meteors.',
     'exposure_s 是每行那张曝光的时长（秒，取自转换后帧的 FITS EXPTIME），没有记录时留空；exposure 是本段合计。':
         'exposure_s is the exposure time of each row’s exposure in seconds (FITS EXPTIME of its converted frame), empty when it was not recorded; exposure gives the segment totals.',
-    '若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（这次没有可用的转换记录）。':
-        'If camera RAW files were converted to DNG working copies when they were added, the list names the working copies: each original has the same name stem and a different hash (no conversion record from this session was available).',
+    '若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（没有找到与之相符的转换记录）。':
+        'If camera RAW files were converted to DNG working copies when they were added, the list names the working copies: each original has the same name stem and a different hash (no matching conversion record was found).',
 })
 
 # Keep or omit everything the current filter shows (2026-11).

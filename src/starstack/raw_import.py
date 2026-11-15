@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 from pathlib import Path
 import subprocess
 import time
@@ -294,3 +295,142 @@ def validate_import(manifest_path, *, original_root=None, cache_root=None, expec
         if not p.is_file() or not dng.is_file() or _sha(p) != source_hash or _sha(dng) != output_hash:
             raise ValueError('An original or its DNG compatibility copy changed')
     return result
+
+
+_RECORD_LIMIT = 2*1024**2
+
+
+def _path_key(path) -> str:
+    return os.path.normcase(os.path.abspath(path))
+
+
+def _linked(path: Path) -> bool:
+    return path.is_symlink() or getattr(path, 'is_junction', lambda: False)()
+
+
+def _import_place(path: Path, base: Path):
+    """(key folder name, path inside it) when ``path`` lies below ``<base>/<key>/``, else None.
+
+    Lexical, ignoring case as Windows does.
+    """
+    parts, root = path.parts, base.parts
+    if len(parts) < len(root)+2 or [os.path.normcase(p) for p in parts[:len(root)]] != [os.path.normcase(p) for p in root]:
+        return None
+    return parts[len(root)], Path(*parts[len(root)+1:])
+
+
+def _recorded_sources(folder: Path, bases) -> dict:
+    """{normalized DNG path inside ``folder``: original name and hashes} from ``folder``/import.json.
+
+    ValueError when the record is unusable.
+
+    Reads the record only. The containment and link checks of validate_import that need no access to the
+    photographs: the originals are not looked at, and the DNG paths below ``folder`` only through lstat.
+    """
+    manifest = folder/'import.json'
+    if any(_linked(part) for part in (manifest, *manifest.parents)):
+        raise ValueError('Import paths must not contain symbolic links or directory junctions')
+    info = manifest.lstat()
+    if not stat.S_ISREG(info.st_mode) or info.st_size > _RECORD_LIMIT:
+        raise ValueError('The import record is invalid or too large')
+    with manifest.open('rb') as stream:
+        data = stream.read(_RECORD_LIMIT+1)
+    if len(data) > _RECORD_LIMIT:
+        raise ValueError('The import record is invalid or too large')
+    result = json.loads(data.decode('utf-8'))
+    if not isinstance(result,dict) or result.get('schema_version') != 1 or result.get('recipe') != 'cfa-lossless-dng14-v1':
+        raise ValueError('Unknown import record')
+    sources, outputs = result.get('sources'), result.get('outputs')
+    inputs, originals = result.get('input_files'), result.get('originals')
+    if not all(isinstance(value, list) for value in (sources, outputs, inputs, originals)) \
+            or not 1 <= len(sources) == len(outputs) == len(inputs) == len(originals) <= 300:
+        raise ValueError('Invalid import records')
+    found, names = {}, set()
+    for source, output, recorded_input, recorded_original in zip(sources, outputs, inputs, originals):
+        if not isinstance(source,dict) or not isinstance(output,dict):
+            raise ValueError('Invalid import records')
+        for record in (source,output):
+            if not isinstance(record.get('sha256'),str) or not re.fullmatch('[0-9a-f]{64}',record['sha256']):
+                raise ValueError('Invalid import digest')
+        original = source.get('path')
+        if not isinstance(original,str) or not Path(original).is_absolute() or Path(original).suffix.lower() not in RAW:
+            raise ValueError('Original paths must be absolute RAW paths')
+        relative = output.get('relative_path')
+        if not isinstance(relative,str):
+            raise ValueError('An imported DNG must use a contained relative path')
+        inner = Path(relative)
+        if (inner.is_absolute() or inner.drive or inner.root or not inner.parts or '..' in inner.parts
+                or inner.suffix.lower() != '.dng'):
+            raise ValueError('An imported DNG must use a contained relative path')
+        if any(_linked(folder.joinpath(*inner.parts[:depth])) for depth in range(1, len(inner.parts)+1)):
+            raise ValueError('Import paths must not contain symbolic links or directory junctions')
+        if not isinstance(recorded_input,str) or not isinstance(recorded_original,str) \
+                or _path_key(recorded_original) != _path_key(original) \
+                or _path_key(recorded_input) not in {_path_key(base/folder.name/inner) for base in bases}:
+            raise ValueError('Import paths do not match the recorded source mapping')
+        dng = os.path.normcase(str(inner))
+        if dng in found or _path_key(original) in names:
+            raise ValueError('Duplicate entries in import record')
+        names.add(_path_key(original))
+        found[dng] = {'file': re.split(r'[\\/]', original)[-1], 'sha256': source['sha256'],
+                      'input_sha256': output['sha256']}
+    return found
+
+
+def import_sources_for(input_paths, cache_root) -> dict:
+    """Original photographs behind stacked DNG working copies, from the import records in the cache. Read only.
+
+    For every path in ``input_paths`` that lies in ``<cache_root>/raw-imports/<key>/``, reads that folder's
+    ``import.json`` (at most one record per distinct ``<key>`` folder) and returns
+    ``{os.path.normcase(os.path.abspath(input)): {'file': original file name, 'sha256': the original's
+    SHA-256, 'input_sha256': the DNG's SHA-256 recorded at conversion}}``, the shape the desktop app builds
+    from what ``prepare_import`` returned. Inputs the records do not name are left out.
+
+    Nothing is written (no files, lock files or folders), and neither the originals nor the DNGs are opened
+    or hashed: names and hashes come from the record, so originals may have moved or been deleted since.
+    The caller must compare ``input_sha256`` with the hash its job recorded for that input and drop entries
+    that differ.
+
+    The checks of ``validate_import`` that need no access to the photographs apply: the record must be
+    exactly ``<cache_root>/raw-imports/<key>/import.json`` with no symbolic link or junction on its path, at
+    most 2 MB, ``schema_version`` 1, recipe ``cfa-lossless-dng14-v1``, 1 to 300 sources paired with as many
+    outputs, 64-hex digests, absolute RAW source paths, relative ``.dng`` outputs inside the record's
+    folder, no duplicates, and paths that agree with the record's own source mapping. A missing,
+    unreadable or invalid record is skipped, not raised: the result holds what the valid records give.
+    A ``ValueError`` is raised only for arguments of the wrong type.
+    """
+    if isinstance(input_paths, (str, bytes)) or not isinstance(input_paths, (list, tuple)):
+        raise ValueError('input_paths must be a list of paths')
+    root = os.fspath(cache_root) if isinstance(cache_root, (str, os.PathLike)) else None
+    if not isinstance(root, str) or not root:
+        raise ValueError('A cache folder is required')
+    try:
+        imports = Path(os.path.abspath(Path(root).expanduser()))/'raw-imports'
+        if any(_linked(part) for part in (imports, *imports.parents)):
+            return {}
+        canonical = imports.resolve()
+    except (OSError, ValueError, RuntimeError):
+        return {}
+    bases = [imports] + ([canonical] if _path_key(canonical) != _path_key(imports) else [])
+    folders = {}   # one record per key folder, however its inputs spell the cache path
+    for item in input_paths:
+        try:
+            text = os.fspath(item) if isinstance(item, (str, os.PathLike)) else None
+            if not isinstance(text, str) or not text:
+                continue
+            path = Path(os.path.abspath(text))
+            place = next((hit for base in bases if (hit := _import_place(path, base))), None)
+        except (TypeError, ValueError):
+            continue
+        if place is not None:
+            name, inner = place
+            folders.setdefault(os.path.normcase(name), (imports/name, []))[1].append(
+                (_path_key(path), os.path.normcase(str(inner))))
+    found = {}
+    for folder, wanted in folders.values():
+        try:
+            recorded = _recorded_sources(folder, bases)
+        except (OSError, ValueError, UnicodeError, RecursionError):
+            continue
+        found.update({key: dict(recorded[inner]) for key, inner in wanted if inner in recorded})
+    return found

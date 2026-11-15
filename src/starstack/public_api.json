@@ -117,6 +117,7 @@
   "raw_import": {
    "ADOBE_DOWNLOAD_URL": "constant:str",
    "find_converter": "(selected=None, *, environ=None) -> 'dict'",
+   "import_sources_for": "(input_paths, cache_root) -> 'dict'",
    "prepare_import": "(input_files, cache_root, *, converter_path=None, force_dng=False, cancelled=None, progress=None, allow_converter_discovery=True) -> 'dict'"
   },
   "references": {

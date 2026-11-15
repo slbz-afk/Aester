@@ -553,14 +553,16 @@ def test_reopening_a_recent_task_after_a_restart_reaches_trail_review(make, app,
     restarted.timer.stop()
     assert restarted.workflow_dir == str(directory.resolve()) and restarted.job_state == "succeeded"
     assert restarted.trail_review_button.isVisible() and restarted.trail_review_button.isEnabled()
-    opened, shown = [], []
+    opened, shown, given = [], [], []
     monkeypatch.setattr("starstack.trail_review_session.open_review",
                         lambda path: opened.append(path) or {"candidates": []})
 
     class Dialog:
         def __init__(self, session, parent, **options):
-            # The triage dialog also takes the workflow record and the in-session original files.
+            # The triage dialog also takes the workflow record, the in-session original files and the cache
+            # folder (where the composite list finds the import records of earlier sessions).
             shown.append(session)
+            given.append(options)
 
         def exec(self):
             return QDialog.DialogCode.Rejected
@@ -568,6 +570,8 @@ def test_reopening_a_recent_task_after_a_restart_reaches_trail_review(make, app,
     restarted.trail_review_button.click()
     settle(restarted, app)
     assert opened == [str(job_dir)] and shown == [{"candidates": []}]
+    # After the restart there is no in-session conversion map; the dialog gets the window's cache folder.
+    assert given[0]["originals"] == {} and given[0]["cache_root"] == str((tmp_path / "cache").absolute())
     restarted.workflow_dir = restarted.job_dir = None
     restarted.job_state = ""
 
