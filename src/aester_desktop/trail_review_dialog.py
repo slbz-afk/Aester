@@ -1184,7 +1184,7 @@ class TrailReviewDialog(QDialog):
         second.addStretch(1)
         keys = QLabel(tr('K 保留 · O 不加回 · U 恢复默认 · 回车 下一条'))
         keys.setToolTip(tr('快捷键作用于选中的候选；焦点在列表或预览上时可用。'))
-        keys.setWordWrap(True)     # never widens the dialog past a laptop screen
+        keys.setWordWrap(self.width() < 1400)     # never widens the dialog past a laptop screen
         keys.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         themes.set_role(keys, 'hint')
         second.addWidget(keys)
@@ -1303,11 +1303,6 @@ class TrailReviewDialog(QDialog):
         self.summary = QLabel(tr('选择候选查看来源与邻帧。'))
         self.summary.setWordWrap(True)
         column.addWidget(self.summary)
-        # Why the scan suggested this identity (its own words, in Chinese for the Chinese interface).
-        self.reasons = QLabel("")
-        self.reasons.setWordWrap(True)
-        themes.set_role(self.reasons, 'hint')
-        column.addWidget(self.reasons)
         column.addWidget(self._build_revision())
         column.addSpacing(6)
         # The real neighbouring exposures side by side, so a trail that continues is seen at a glance.
@@ -1333,6 +1328,13 @@ class TrailReviewDialog(QDialog):
         self.context_notice.setWordWrap(True)
         themes.set_role(self.context_notice, 'hint')
         column.addWidget(self.context_notice)
+        column.addSpacing(6)
+        # Why the scan suggested this identity (its own words, in Chinese for the Chinese interface);
+        # below the neighbours, which are the evidence to look at first.
+        self.reasons = QLabel("")
+        self.reasons.setWordWrap(True)
+        themes.set_role(self.reasons, 'hint')
+        column.addWidget(self.reasons)
         column.addStretch(1)
         scroll = QScrollArea()
         scroll.setWidget(box)
