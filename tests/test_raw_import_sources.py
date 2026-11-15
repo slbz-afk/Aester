@@ -246,3 +246,84 @@ def test_a_folder_named_import_json_or_a_missing_record_is_skipped(tmp_path):
 def test_wrong_argument_types_raise(arguments):
     with pytest.raises(ValueError):
         ri.import_sources_for(*arguments)
+
+
+def test_inputs_outside_any_import_folder_never_touch_the_disk(tmp_path, monkeypatch, opened):
+    """A job whose inputs lie outside every raw-imports folder: the cache folder (perhaps a network drive that
+    is not connected) is not looked at, not even to resolve it."""
+    cache = tmp_path / "cache"
+    _, _, inputs = write_record(cache)
+    elsewhere = [str(tmp_path / "shots" / f"DSC_{n:04d}.dng") for n in range(1, 49)]
+    elsewhere += [str(tmp_path / "raw-imports" / "lonely.dng"), str(tmp_path / "x" / "raw-imports")]
+    touched = []
+    opened.clear()
+
+    def recording(name, real):
+        def method(*args, **kwargs):
+            touched.append(name)
+            return real(*args, **kwargs)
+        return method
+
+    def lookup(paths, root):
+        """Run the lookup with every disk query recorded; the patches are gone before pytest reports."""
+        with monkeypatch.context() as patch:
+            for name in ("is_symlink", "is_junction", "resolve", "lstat", "stat", "exists", "is_file", "is_dir"):
+                patch.setattr(Path, name, recording(f"Path.{name}", getattr(Path, name)))
+            patch.setattr(os, "lstat", recording("os.lstat", os.lstat))
+            patch.setattr(os, "stat", recording("os.stat", os.stat))
+            patch.setattr(os.path, "realpath", recording("os.path.realpath", os.path.realpath))
+            return ri.import_sources_for(paths, root)
+    assert lookup(elsewhere, cache) == {}
+    assert lookup(elsewhere, "//server/share/aester cache") == {}
+    assert touched == [] and opened == []
+    # The same call with its own inputs among them does look, and finds them.
+    assert len(lookup(elsewhere + inputs, cache)) == 3 and touched
+
+
+def test_inputs_written_under_the_real_cache_path_match_another_spelling_of_it(tmp_path):
+    """prepare_import writes its inputs under the resolved cache folder; the cache setting may spell the same
+    folder differently (here its 8.3 short name). The lexical pass must not drop them."""
+    if os.name != "nt":
+        pytest.skip("8.3 short names are a Windows feature")
+    import ctypes
+    cache = tmp_path / "long cache folder name"
+    _, record, inputs = write_record(cache)
+    buffer = ctypes.create_unicode_buffer(1024)
+    if not ctypes.windll.kernel32.GetShortPathNameW(str(cache), buffer, 1024):
+        pytest.skip("no short name available")
+    short = buffer.value
+    if os.path.normcase(short) == os.path.normcase(str(cache)):
+        pytest.skip("this volume makes no 8.3 short names")
+    assert ri.import_sources_for(inputs, short) == expected(record, inputs)
+
+
+def test_a_link_beside_the_requested_dngs_does_not_spoil_them(tmp_path):
+    """Links are looked for on the record's path and on the requested DNG paths only."""
+    cache = tmp_path / "cache"
+    folder, record, inputs = write_record(cache)
+    (tmp_path / "elsewhere").mkdir()
+    _link_folder(folder / "0002", tmp_path / "elsewhere")
+    linked = os.path.normcase(os.path.abspath(inputs[1]))
+    assert ri.import_sources_for([inputs[0], inputs[2]], cache) == {
+        key: value for key, value in expected(record, inputs).items() if key != linked}
+    assert ri.import_sources_for([inputs[1]], cache) == {}
+    assert ri.import_sources_for(inputs, cache) == {}
+
+
+@pytest.mark.parametrize("name", ["not_raw", "mapping", "digest_upper", "escape"])
+def test_every_entry_of_a_record_is_checked_even_when_one_input_is_asked_for(tmp_path, name):
+    cache = tmp_path / "cache"
+    _, _, inputs = write_record(cache, change=_broken(name))
+    assert ri.import_sources_for([inputs[2]], cache) == {}
+
+
+def test_at_most_300_key_folders_are_read(tmp_path, opened):
+    cache = tmp_path / "cache"
+    inputs = []
+    for number in range(301):
+        _, _, paths = write_record(cache, key=f"{number:024x}", count=1, shots=tmp_path / "shots" / str(number))
+        inputs += paths
+    opened.clear()
+    found = ri.import_sources_for(inputs, cache)
+    assert len(found) == 300 and os.path.normcase(os.path.abspath(inputs[-1])) not in found
+    assert len(opened) == 300
