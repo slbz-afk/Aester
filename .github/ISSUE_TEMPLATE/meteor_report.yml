@@ -1,15 +1,18 @@
-name: 流星雨出图回执
-description: 用 Aester 处理了一场流星雨（例如双子座）后，告诉我们结果，好的坏的都欢迎
+name: 流星雨出图回执 / Meteor shower result
+description: 用 Aester 处理了一场流星雨（例如双子座）后，告诉我们结果，好的坏的都欢迎 / Tell us how Aester did on a meteor shower, good or bad
 title: "[流星雨出图回执] "
+labels: ["meteor-report"]
 body:
   - type: markdown
     attributes:
       value: |
         谢谢你用 Aester 处理流星雨。这份回执帮我们了解它在真实拍摄中好不好用，每一项都可以写个大概。
 
-        **请不要在这里上传 RAW 原片。** issue 是公开的，任何人都能下载；照片里还可能带有 GPS 位置和机身序列号。如果你愿意提供素材，在最后一栏说一声，传送方式和使用范围另行私下约定。
+        **请不要在这里上传 RAW 原片。** issue 是公开的，任何人都能下载；照片里还可能带有 GPS 位置和机身序列号。
 
         不用 GitHub 的话，也可以把同样的内容发邮件到 aester-star-stacker@outlook.com。
+
+        This form is in Chinese; answers in English are welcome. Please do not upload RAW files here.
   - type: input
     id: version
     attributes:
@@ -54,13 +57,14 @@ body:
     id: segments
     attributes:
       label: 分了几段处理
-      description: Aester 每个任务最多 300 张，更长的连拍要分段
+      description: Aester 每个任务最多 300 张，更长的连拍要分段；没跑完的写实际提交了几段
     validations:
       required: true
   - type: input
     id: frames_per_segment
     attributes:
       label: 每段多少张
+      description: 没跑完的写实际提交的张数
       placeholder: 150 / 150 / 120
     validations:
       required: true
@@ -68,7 +72,7 @@ body:
     id: time_per_segment
     attributes:
       label: 每段处理用时
-      description: 从点“开始合成”到完成，每段大约几分钟
+      description: 从点“开始合成”到完成，每段大约几分钟；失败或没跑完的写“失败”，并在最后一栏说明
       placeholder: 25 / 24 / 20 分钟
     validations:
       required: true
@@ -84,7 +88,7 @@ body:
     id: auto_kept
     attributes:
       label: 自动加回了几条
-      description: 成片下方说明行里“已加回 N 条（算法 a …）”的算法那一项；分段的写每段
+      description: 成片下方说明行里“已加回 N 条（算法 a …）”的算法那一项；分段的写每段；没出图的写“无”
     validations:
       required: true
   - type: input
@@ -119,4 +123,4 @@ body:
     id: problems
     attributes:
       label: 遇到的问题
-      description: 安装、处理、复核、出图中的任何问题都可以写。出错时请附窗口底部“详情”里的消息。愿意提供素材的也在这里说一声，不要上传原片。
+      description: 安装、处理、复核、出图中的任何问题都可以写。出错时请附窗口底部“详情”里的消息。不要上传原片。
