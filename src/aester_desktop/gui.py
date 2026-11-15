@@ -9,7 +9,7 @@ import os
 import math
 import sys
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from starstack.i18n import tr, set_language, get_language, normalize_language, startup_language, translate_message
 from typing import Any, Callable
@@ -47,6 +47,10 @@ STAGE_LABELS = {
     "composite": "合成天空与地景", "blend": "合成天空与地景",
     "render": "生成成片", "styles": "生成三种风格", "export": "保存结果",
     "done": "已完成", "complete": "已完成",
+    # Stages the stack job and the workflow record report (core.py / workflow.py _update calls).
+    "import": "准备素材", "calibrate": "校准镜头畸变", "support": "对齐星空", "compose": "合成天空与地景",
+    "transients": "寻找流星等亮迹", "trail_addback": "加回流星", "preflight": "核验素材", "milkyway": "增强银河",
+    "resume": "准备继续",
 }
 
 # Kept for integrations which used the original dark stylesheet.
@@ -473,6 +477,10 @@ class MainWindow(QMainWindow):
         self._disk_estimate_timer.setSingleShot(True)
         self._disk_estimate_timer.setInterval(250)
         self._disk_estimate_timer.timeout.connect(self._launch_disk_estimate)
+        # Elapsed time of the running workflow attempt (UTC start), shown in the readout.
+        self._run_started: Any = None
+        self._run_started_for: tuple[str, int] | None = None
+        self._resume_requested: tuple[str, datetime] | None = None
         self._build_ui()
         self._restore_preferences()
         self.timer = QTimer(self)
@@ -3948,6 +3956,43 @@ class MainWindow(QMainWindow):
                 jpgs.append({"path": str(base), "name": "final.jpg", "kind": "jpeg", "label": '基础成片'})
         return jpgs
 
+    def _attempt_started(self, record: dict[str, Any]) -> datetime | None:
+        """When the current attempt of this workflow started, or None when that is not known.
+
+        The first attempt starts at the record's ``created_at``. A resumed attempt is timed only from a resume
+        this window asked for; one resumed elsewhere shows no elapsed time rather than a wrong one.
+        """
+        directory = str(self.workflow_dir or record.get("workflow_dir") or "")
+        attempt = record.get("attempt", 1)
+        attempt = attempt if type(attempt) is int else 1
+        key = (os.path.normcase(directory), attempt)
+        if self._run_started_for == key:
+            return self._run_started
+        started = None
+        if attempt == 1:
+            try:
+                started = datetime.fromisoformat(str(record.get("created_at")))
+            except (TypeError, ValueError):
+                started = None
+            if started is not None and started.tzinfo is None:
+                started = None
+        else:
+            requested = getattr(self, "_resume_requested", None)
+            if requested and requested[0] == os.path.normcase(directory):
+                started = requested[1]
+        self._run_started_for, self._run_started = key, started
+        return started
+
+    def _elapsed_text(self, record: dict[str, Any]) -> str:
+        """'12:05' or '1:02:05' since the attempt started; '' when unknown."""
+        started = self._attempt_started(record)
+        if started is None:
+            return ""
+        seconds = max(0, int((datetime.now(timezone.utc) - started).total_seconds()))
+        hours, rest = divmod(seconds, 3600)
+        minutes, seconds = divmod(rest, 60)
+        return f"{hours}:{minutes:02d}:{seconds:02d}" if hours else f"{minutes}:{seconds:02d}"
+
     def _apply_workflow_record(self, record: dict[str, Any]) -> None:
         self._workflow = dict(record)
         self.job_state = str(record.get("state") or "")
@@ -3963,8 +4008,18 @@ class MainWindow(QMainWindow):
         workflow_stages = {"stack": tr('对齐并堆栈'), "separation": tr('分离星点图层'), "starless": tr('分离星点图层'),
                            "density_advice": tr('评估星点密度'), "star_reduction": tr('整理星点'),
                            "layer_export": tr('保存后期图层'), "publish": tr('保存结果'), "export": tr('保存结果')}
-        self.stage_label.setText(workflow_stages.get(stage, tr(STAGE_LABELS.get(stage, title)))
-                                 if self.job_state == "running" else title)
+        stage_text = workflow_stages.get(stage, tr(STAGE_LABELS.get(stage, title)))
+        if stage == "stack":
+            # The stack job's own stage, read through core.load_job above: 读取图像 … 寻找流星等亮迹.
+            child = str((self._job or {}).get("stage") or "")
+            if child in STAGE_LABELS and child not in {"queued", "complete", "done", "stack"}:
+                stage_text = tr(STAGE_LABELS[child])
+        if self.job_state in {"queued", "running"}:
+            elapsed = self._elapsed_text(record)
+            shown = stage_text if self.job_state == "running" else title
+            self.stage_label.setText(tr('{0} · 已用 {1}', shown, elapsed) if elapsed else shown)
+        else:
+            self.stage_label.setText(title)
         try:
             progress = max(0, min(100, int(record.get("progress") or 0)))
         except (TypeError, ValueError):
@@ -4075,6 +4130,7 @@ class MainWindow(QMainWindow):
         if self.workflow_dir and self.job_state in {"failed", "cancelled"}:
             from starstack.workflow import resume_workflow
             directory = self.workflow_dir
+            self._resume_requested = (os.path.normcase(str(directory)), datetime.now(timezone.utc))
             self._busy = True
             self.message_label.setText(tr('正在恢复完整出图任务…'))
             self._update_controls()

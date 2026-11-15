@@ -788,6 +788,13 @@ EN.update({
     '一共 {0} 张，超过每个任务 300 张的上限。请分段处理：每段约 150 张、约 30 分钟，分别添加并合成，每段出一张图。':
         '{0} photos in total, more than the limit of 300 per job. Process them in segments of about 150 photos '
         '(about 30 minutes): add and stack each segment separately; each segment gives one image.',
+    '{0} · 已用 {1}': '{0} · elapsed {1}',
+    '校准镜头畸变': 'Calibrating lens distortion',
+    '寻找流星等亮迹': 'Finding meteors and trails',
+    '加回流星': 'Adding meteors back',
+    '核验素材': 'Checking photos',
+    '增强银河': 'Enhancing the Milky Way',
+    '准备继续': 'Preparing to continue',
     '最近的任务': 'Recent jobs',
     ' · 含亮迹': ' · with trails',
     '还没有最近的任务': 'No recent jobs yet',
