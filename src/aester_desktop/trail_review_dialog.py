@@ -1082,14 +1082,7 @@ class TrailReviewDialog(QDialog):
         self.location.candidateToggled.connect(self.toggle_candidate)
         self._refresh_decisions()
         self._update_export_button()
-        # Columns fit their (translated) content once; the choice column keeps a fixed width.
-        for column, (minimum, maximum) in enumerate(((100, 170), (64, 110), (110, 175))):
-            self.list.resizeColumnToContents(column)
-            self.list.setColumnWidth(column, min(maximum, max(minimum, self.list.columnWidth(column) + 6)))
-        self.list.setColumnWidth(COL_CHOICE, 76)
-        for column in (COL_PRIORITY, COL_TIME, COL_SNR, COL_LENGTH):
-            self.list.resizeColumnToContents(column)
-            self.list.setColumnWidth(column, min(90, max(44, self.list.columnWidth(column) + 16)))
+        self._fit_columns()
         # Shown order: candidate, priority, identity, decision, time, brightness, length, this choice
         # (logical column numbers stay as they were).
         header.moveSection(header.visualIndex(COL_PRIORITY), 1)
@@ -1118,14 +1111,25 @@ class TrailReviewDialog(QDialog):
 
     def showEvent(self, event):  # noqa: N802 - Qt override
         super().showEvent(event)
-        if not self._sized:      # sizes set before the first layout are only proportions
+        if not self._sized:      # sizes set before the first layout are only proportions; fonts are final now
             self._sized = True
+            self._fit_columns()
             self._initial_sizes()
+
+    def _fit_columns(self):
+        """Columns fit their (translated) content; the identity and decision columns leave room for the dot."""
+        for column, (minimum, maximum, extra) in enumerate(((92, 170, 6), (64, 110, 18), (100, 175, 18))):
+            self.list.resizeColumnToContents(column)
+            self.list.setColumnWidth(column, min(maximum, max(minimum, self.list.columnWidth(column) + extra)))
+        self.list.setColumnWidth(COL_CHOICE, 76)
+        for column in (COL_PRIORITY, COL_TIME, COL_SNR, COL_LENGTH):
+            self.list.resizeColumnToContents(column)
+            self.list.setColumnWidth(column, min(90, max(44, self.list.columnWidth(column) + 16)))
 
     def _initial_sizes(self):
         width = self.width()
-        details = max(300, min(520, int(width * .30))) if width >= 1100 else 0
-        listed = max(380, min(600, int(width * .40)))
+        details = max(300, min(520, int(width * .28))) if width >= 1100 else 0
+        listed = max(380, min(600, int(width * .42)))
         self.split.setSizes([listed, max(300, width - listed - details - 40), details])
         self.details_button.blockSignals(True)
         self.details_button.setChecked(bool(details))
@@ -1343,7 +1347,7 @@ class TrailReviewDialog(QDialog):
         """Show or collapse the side panel; the preview takes its room."""
         sizes = self.split.sizes()
         if shown and sizes[2] == 0:
-            width = max(300, min(520, int(self.width() * .30)))
+            width = max(300, min(520, int(self.width() * .28)))
             sizes = [sizes[0], max(200, sizes[1] - width), width]
         elif not shown and sizes[2]:
             sizes = [sizes[0], sizes[1] + sizes[2], 0]
