@@ -2,15 +2,27 @@
 
 ## Installation and first launch
 
-Run the Aester installer and choose an installation folder. It prepares the basic runtime and Siril during installation. An internet connection is needed at this stage; if a download stops, retry to reuse files that have already passed verification. The installer first times the official servers and the listed mirrors and downloads from the fastest; every file is checked against its SHA-256.
+Run the Aester installer and choose an installation folder. It prepares the basic runtime and Siril during installation. An internet connection is needed at this stage; if a download stops, retry to reuse files that have already passed verification. For the Python packages, the installer first times the official servers and the listed mirrors in mainland China and downloads from the fastest; Siril comes only from its official site, free-astro.org, with no mirror. Every file is checked against its SHA-256.
 
-To use **Reduce stars** or export starless layers, select the optional **nox star removal component**. It is not selected by default, and installing it does not turn on any photo effects. You can try basic stacking first and add nox later by running the installer again, or select the conversion verified for this project under **Settings → Components & prompts**. After changing the runtime, save your editing project and restart when prompted.
+**Reduce stars** and starless layers need the nox star-removal model. The rights to this third-party model's training data are still being checked, so it is not offered for download and these features are unavailable for now. If you already have the conversion verified for this project, select it under **Settings → Components & prompts**. After changing the runtime, save your editing project and restart when prompted.
+
+The installer is not code-signed. After downloading, you can compare it with `SHA256SUMS.txt` next to the installer on the GitHub Releases page: open PowerShell in the folder that holds the installer, run `Get-FileHash <installer file name> -Algorithm SHA256`, and check that the Hash equals the line for the same file (upper or lower case does not matter). With Smart App Control on in Windows 11, Aester may be blocked; see “Blocked by Smart App Control” below.
 
 On the welcome screen, choose **Start using Aester** or **Connect an AI assistant**. No language model is needed for any installed local processing feature. You can reopen the welcome screen from Help.
 
 Under **Settings → Appearance**, choose a light or dark theme. The choice is remembered. The same menu also holds **Night vision** and **Image surround**; see “Viewing conditions and interface marks” below. Light and dark themes change the interface only: photo previews, region overlays and finished images keep their original colours.
 
 Under **Settings → Language**, choose **English** or **中文**. Save your editing project and restart Aester to apply the language throughout the interface. The choice is remembered. Error messages follow the interface language as well. Language changes do not alter your photographs, processing recipes, file paths or MCP protocol keys.
+
+<a name="sac"></a>
+
+## Blocked by Smart App Control
+
+When Smart App Control is on in Windows 11, it blocks programs that Microsoft cannot judge to be safe and that have no valid signature, and it cannot make an exception for a single program. Aester and the official Siril it uses are not code-signed, so they may be blocked.
+
+To check whether it is on, open **Windows Security → App & browser control → Smart App Control settings**. The state is On, Evaluation or Off; in Evaluation it blocks nothing.
+
+If Aester is blocked, the only remedy is to set it to Off in the same place. Before you do, note that whether you can turn it on again depends on your Windows version; on older versions it can only be turned on again after resetting or reinstalling Windows. Windows 10 does not have this feature.
 
 <a name="start"></a>
 
@@ -20,12 +32,12 @@ The stage bar across the top of the window shows 01 Photos, 02 First frame, 03 R
 
 The viewing area is on the left. The right column follows the working order: ① Regions, ② Colour and ③ Optional effects, with **Save photographs to** and **Start stacking / Stop** fixed at its bottom. The readout strip along the bottom of the window shows the stage, progress, percentage and the full message; **Details** opens the processing record.
 
-1. **Add photos.** Select a sequence of RAW exposures taken from the same position with the same composition. You can select multiple files, drag them into the window, use **Add photos** and **Remove selected** above the viewing area, or use **Clear all** to empty the selection without deleting originals. At least three are needed for stacking; a single file can still be previewed. The first photo in the list below the image (the first frame) is the colour reference. Each small dot above the image is one photo; the ringed dot is the first frame.
+1. **Add photos.** Select a sequence of RAW exposures taken from the same position with the same composition. You can select multiple files, drag them into the window, use **Add photos** and **Remove selected** above the viewing area, or use **Clear all** to empty the selection without deleting originals. At least three are needed for stacking and at most 300 per job; a single file can still be previewed. The first photo in the list below the image (the first frame) is the colour reference. Each small dot above the image is one photo; the ringed dot is the first frame.
 2. **Mark relevant regions.** Choose **Mark sky / foreground / Milky Way** in ① Regions on the right. Draw the foreground boundary if present, and an ellipse over a visible Milky Way. An unmarked foreground means the entire image is sky; an undrawn Milky Way stays off. No repeated confirmation is needed.
 3. **Adjust colour and choose effects.** The sliders in ② Colour change warmth, green–magenta tint and exposure. All three effects in ③ Optional effects start off. Colour dragging uses a small responsive proxy; a sharper preview follows when you stop.
 4. **Start stacking.** Choose **Start stacking** at the bottom of the right column. When processing finishes, choose **Open photographs folder** in the view row (also in the File menu) to find your linear master, 16-bit finished TIFF and JPEG.
 
-Processing happens on your computer and leaves the original files unchanged. Start with a small set. Do not mix different nights, changed compositions or substantially different exposures in one job.
+Processing happens on your computer and leaves the original files unchanged. Start with a small set. Do not mix different nights, changed compositions or substantially different exposures in one job. Split a sequence of more than 300 photos into segments; each segment gives its own image, and segments are not combined automatically. The longest continuous sequence tested so far is about 31 minutes; until longer ones are tested, about 30 minutes, or around 150 photos, per segment is advised.
 
 <a name="colors"></a>
 
@@ -88,7 +100,7 @@ Enable **Reduce stars** in ③ Optional effects when the star field looks too cr
 
 At 0%, the image is unchanged. Intermediate settings mainly reduce faint and medium-bright stars. High strengths also weaken bright stars; 100% removes the entire star layer separated by the current backend. The recommendation is an adjustable aesthetic starting point. The cleanliness of the starless background still depends on that backend, and halos may remain around bright stars.
 
-A star removal model must be configured. Installing or selecting a model does not enable this effect automatically. Basic stacking still works without a model.
+A star removal model must be configured. The nox model is not offered for download for now, so without the conversion verified by this project this effect cannot be used. Installing or selecting a model does not enable this effect automatically. Basic stacking still works without a model.
 
 After drawing the Milky Way, you can set its relative offset. For example, background 80% with offset −20% gives 60% in the Milky Way. A negative offset leaves more stars inside it. The offset takes effect only for a drawn Milky Way. When star reduction is enabled, the displayed and delivered final photo is the reduced version.
 
@@ -100,7 +112,7 @@ For layered editing, also tick **Also save starless image** or **Also save star 
 
 Enable **Preserve meteors and trails** in ③ Optional effects. Leave this effect off when it is not needed. Aester then skips the trail scan and does not produce an additional trail-replay version.
 
-When enabled, a new job first finishes the base photograph, then automatically adds back meteor candidates whose measurement is reliable (measured, with no width, profile or sideband flags) and saves them as a separate with-trails version. This is an algorithmic suggestion, not identity certification; other candidates wait for your review, and the base photograph is always kept. The photographs folder then holds the base folder `delivery-<token>` and the with-trails folder `delivery-trails-<n>kept-<token>`. The result tabs read **With trails / Base photograph**, with the with-trails version shown first; the note reads like “With-trails version · N added back (algorithm a / human h / Agent g) · M more to check”.
+When enabled, a new job first finishes the base photograph, then automatically adds back meteor candidates whose measurement is reliable (measured, with no width, profile or sideband flags) and saves them as a separate with-trails version. This is an algorithmic suggestion, not identity certification; other candidates wait for your review, and the base photograph is always kept. Review uses this job's cache, so do not clean it before you have finished reviewing. The photographs folder then holds the base folder `delivery-<token>` and the with-trails folder `delivery-trails-<n>kept-<token>`. The result tabs read **With trails / Base photograph**, with the with-trails version shown first; the note reads like “With-trails version · N added back (algorithm a / human h / Agent g) · M more to check”.
 
 To check or change the choices, choose **Review trail candidates**, below **Start stacking / Stop** at the bottom of the right column:
 
@@ -148,11 +160,11 @@ Large intermediate files are kept separately in the local work cache, normally u
 
 The delivered images can be viewed and edited independently. New linear masters store their colour information and saturation-protection region inside the TIFF, so copying the master alone is enough to render it again in Aester. A master does not contain all RAW exposures or the complete processing history, and is not a backup of the originals. Keep older-format delivery folders together.
 
-Processing runs in a separate process. Closing the window does not cancel it; use **Stop** at the bottom of the right column when you want processing to stop. Progress appears in the readout strip at the bottom of the window. After a failure, logs and completed stages are retained and the File menu can resume eligible jobs. If the original files or configuration have changed, start a new job instead.
+Processing runs in a separate process. Closing the window does not cancel it; use **Stop** at the bottom of the right column when you want processing to stop. Progress appears in the readout strip at the bottom of the window. After you stop a job or it fails, logs and completed stages are retained; **Resume job** in the readout strip at the bottom of the window, or **File → Resume unfinished job…**, continues eligible jobs from their checkpoint. If the original files or configuration have changed, start a new job instead.
 
 **File → Save editing project** records the photo list, regions, colour and effects. Open the editing project to continue adjusting them. A project refers to the originals and local preview cache; it does not copy every photo. Keep these referenced files when moving to another computer.
 
-**Settings → Photographs and cache** lists the jobs in your cache folders with each job's size, the space it can free and its status. A 48-frame job usually leaves tens of GB in the cache, most of it per-frame intermediate files. Select finished jobs, click **Clean intermediate files of selected jobs…** and confirm: only per-frame files that can be rebuilt from the originals are deleted, namely converted and registered frames, sequence files, copies of the originals, stacking trial and input frames, and FITS debayering frames. Photographs, originals, masters, processing records, logs and unknown files are all kept, and nothing else is deleted automatically.
+**Settings → Photographs and cache** lists the jobs in your cache folders with each job's size, the space it can free and its status. With default settings each 45 MP RAW file takes about 0.9 GB of cache: a 48-frame job usually leaves tens of GB and 150 frames about 150 GB, most of it per-frame intermediate files. When stacking starts, Aester checks the free disk space and does not start if it is too small. Select finished jobs, click **Clean intermediate files of selected jobs…** and confirm: only per-frame files that can be rebuilt from the originals are deleted, namely converted and registered frames, sequence files, copies of the originals, stacking trial and input frames, and FITS debayering frames. Photographs, originals, masters, processing records, logs and unknown files are all kept, and nothing else is deleted automatically.
 
 Before cleaning, Aester verifies the photographs folders. The originals may already have been moved elsewhere, but when an original is no longer at its recorded location (or its size changed), its copy in the cache is kept, so the last copy of a photo is never deleted. A job that is running, whose trails are being reviewed or that another window is using cannot be cleaned; try again later. If another program holds a file open, that file is kept and the list shows the job as partly cleaned; close that program and clean again.
 
@@ -225,7 +237,7 @@ Advanced tools remain available, but beginners should not have to learn internal
 
 ## Current limits
 
-Aester is a provisional name and this is a development version. Principal real-world validation covers Nikon Z8 wide-field scenes and one Seestar deep-sky sequence. Decoding another camera model does not establish photographic quality for that model.
+This is a preview version. Principal real-world validation covers Nikon Z8 wide-field scenes and one Seestar deep-sky sequence. Decoding another camera model does not establish photographic quality for that model.
 
 Complex foreground joins, general meteor identification, production-quality starless works and fully automatic Milky Way localisation have not all passed acceptance. A Windows installation candidate is available, but installation and real material still need testing on other computers.
 
