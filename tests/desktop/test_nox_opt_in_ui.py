@@ -132,6 +132,7 @@ def test_chosen_existing_model_is_passed_only_after_explicit_prepare(window, mon
     assert install.call_args.kwargs['consent'] is True
 
 
+# Release-state guard: update together with README/guide when the nox download is published.
 def test_this_builds_manifest_offers_no_nox_download():
     from aester_desktop import gui
     assert components.nox_install_info()['available'] is False
@@ -171,7 +172,8 @@ def test_stars_off_without_download_or_model_but_a_chosen_model_enables_it(windo
     window._update_controls()
     assert not window.stars_enabled.isEnabled() and not window.stars_enabled.isChecked()
     assert window.stars_unavailable_note.isVisible() and '暂不可用' in window.stars_unavailable_note.text()
-    assert '处理后端' in window.stars_enabled.toolTip()
+    # Same route as the user guide: preparing there also installs the optional onnxruntime the model needs.
+    assert '组件与提示词管理' in window.stars_enabled.toolTip()
     window.star_model_path.setText('verified/nox_color.onnx')  # a user-supplied verified model still works
     assert window.stars_enabled.isEnabled()
     assert not window.stars_unavailable_note.isVisible() and window.stars_enabled.toolTip() == ''

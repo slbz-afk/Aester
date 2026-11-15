@@ -2907,7 +2907,7 @@ class MainWindow(QMainWindow):
         self.stars_unavailable_note.setVisible(not stars_possible)
         self.stars_enabled.setToolTip('' if stars_possible else
                                       tr('nox 模型的训练数据权利还在核查，此版本不提供下载。'
-                                         '已有本项目核验的转换模型时，可在“设置 → 处理后端”选择。'))
+                                         '已有本项目核验的转换模型时，可在“设置 → 组件与提示词管理”选择并准备。'))
         color_available = not self.input_files or Path(self.input_files[0]).suffix.lower() in RAW
         for control in (self.warmth_slider, self.tint_slider, self.exposure_slider, self.reset_color_button):
             control.setEnabled(idle and color_available)
