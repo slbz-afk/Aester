@@ -30,7 +30,7 @@ The window follows six stages:
 
 **Optional effects (all off by default):**
 
-- **Keep meteors and other trails**: the base image is finished first. Meteors the algorithm considers reliable are then added back automatically and saved as a separate version; other trails are left for you to review. You can check and change each decision under **Review trail candidates** and render again. Review uses the job's cache, so do not clean it before you have finished reviewing.
+- **Preserve meteors and trails**: the base image is finished first. Meteors the algorithm considers reliable are then added back automatically and saved as a separate version; other trails are left for you to review. You can check and change each decision under **Review trail candidates** and render again. Review uses the job's cache, so do not clean it before you have finished reviewing.
 - **Enhance the Milky Way**: a graded enhancement inside the drawn Milky Way ellipse only.
 
 See the [user guide](docs/USER_GUIDE_EN.md) for details.
@@ -47,7 +47,7 @@ Download `Aester-…-Setup.exe` from [Releases](https://github.com/slbz-afk/Aest
   - Afterwards Aester runs fully offline.
 - **Disk**:
   - About 1–2 GB for the program and components.
-  - Processing cache is extra: with default settings about 0.9 GB per 45 MP RAW file, for example about 50–80 GB for 48 files and about 150 GB for 150 files.
+  - Processing cache is extra: with default settings about 0.9 GB per 45 MP RAW file, for example about 50–80 GB for 48 files and about 150 GB for 150 files. Cache scales roughly with pixel count (estimate): about 0.5 GB per photo at 24 MP and 1.3 GB at 61 MP; the check at start uses your actual files.
   - Caches can be cleaned per job under Settings → Photographs and cache. After cleaning, that job's trails can no longer be reviewed.
 - **Memory**: 16 GB or more recommended.
 - **Unsigned installer**: Windows may show "Windows protected your PC". If the file comes from this page and the checksum matches, choose "More info → Run anyway".
@@ -58,7 +58,7 @@ Download `Aester-…-Setup.exe` from [Releases](https://github.com/slbz-afk/Aest
 Get-FileHash .\Aester-…-Setup.exe -Algorithm SHA256
 ```
 
-Replace `…` with the actual file name. If the Hash shown equals the line for the same file in `SHA256SUMS.txt` (upper or lower case does not matter), the file is intact.
+Replace the whole `Aester-…-Setup.exe` with the name of the file you downloaded, for example `.\Aester-1.0.0-rc.1-Setup.exe`. (To open PowerShell in that folder, type powershell in File Explorer's address bar and press Enter.) If the Hash shown equals the line for the same file in `SHA256SUMS.txt` (upper or lower case does not matter), the file is intact.
 
 ### Windows Smart App Control
 
@@ -72,7 +72,7 @@ Based on Microsoft's pages: [Smart App Control FAQ](https://support.microsoft.co
 
 ## Cameras
 
-- **Tested with real sequences**: the Nikon Z 8 has gone through the full workflow with real night-sky sequences. A set of ZWO Seestar S30 Pro deep-sky frames stacks into an image, but its look did not pass review, and smart-telescope work is paused.
+- **Tested with real sequences**: the Nikon Z 8 has gone through the full workflow with real night-sky sequences. A set of 16 ZWO Seestar S30 Pro deep-sky exposures goes through the full stacking job (tier A in `starstack devices`), but the look did not pass our image-quality check, and smart-telescope work is paused.
 - **Decoded but not sequence-tested**: twenty-odd Sony, Nikon and Canon bodies; most have a default camera look.
 - **Other cameras**: work if LibRaw 0.22.1 can decode them.
 
@@ -81,15 +81,15 @@ Run `starstack devices` for the full list. Reports with your camera are welcome.
 ## Known limitations
 
 - **Not every scene comes out right straight away.** Clouds, obstructions, trees moving in the wind, strong light pollution and colour fringing remain hard. Deep-sky images from smart telescopes have basic support only.
-- **At most 300 photos per job.** Split longer sequences into segments; each segment gives its own image, and segments are not combined automatically. The longest continuous sequence tested so far is about 31 minutes; until longer ones are tested, about 30 minutes, or around 150 photos, per segment is advised.
+- **At most 300 photos per job.** Split longer sequences into segments; each segment gives its own image, and segments are not combined automatically. The longest continuous sequence tested so far is about 31 minutes; until longer ones are tested, keep each segment to about 30 minutes and no more than about 150 photos, whichever comes first.
 - **Meteor identification is not guaranteed.** A trail added back automatically may still be a satellite or an aircraft, and meteors can be missed; check them under **Review trail candidates**.
-- **Star cleanup is not available.** It needs the optional nox model; the rights to that third-party model's training data are still being checked, so it is not offered for download. When it is, it remains an algorithmic estimate; bright stars may keep a residual halo.
+- **Reduce stars is not available.** It needs the optional nox model; the rights to that third-party model's training data are still being checked, so it is not offered for download. When it is, it remains an algorithmic estimate; bright stars may keep a residual halo.
 - **Retouching needs GIMP 3.2.6** and your own AI assistant with MCP and image support.
 - **Little testing on other PCs.** Testing on other computers and on high-DPI multi-monitor setups is still limited. Please [report problems](https://github.com/slbz-afk/Aester/issues).
 
 ## AI assistants
 
-Aester includes an MCP server with tools for import, regions, processing, trail review, stars, Milky Way, export and retouching. The welcome screen copies a client configuration and tests the connection. See the [user guide](docs/USER_GUIDE_EN.md#mcp).
+Aester includes an MCP server with tools for import, regions, processing, trail review, stars (needs a star-removal model; not available for now), Milky Way, export and retouching. The welcome screen copies a client configuration and tests the connection. See the [user guide](docs/USER_GUIDE_EN.md#mcp).
 
 ## Licence
 
