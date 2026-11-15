@@ -558,7 +558,8 @@ def test_reopening_a_recent_task_after_a_restart_reaches_trail_review(make, app,
                         lambda path: opened.append(path) or {"candidates": []})
 
     class Dialog:
-        def __init__(self, session, parent):
+        def __init__(self, session, parent, **options):
+            # The triage dialog also takes the workflow record and the in-session original files.
             shown.append(session)
 
         def exec(self):
