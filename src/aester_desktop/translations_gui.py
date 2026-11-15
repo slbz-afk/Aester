@@ -270,7 +270,6 @@ EN = {
     '选择星空照片（可多选）': 'Choose night-sky photos (multiple selection)',
     '星空素材 (*.nef *.cr2 *.cr3 *.arw *.dng *.raf *.rw2 *.orf *.pef *.srw *.raw *.fit *.fits *.fts);;所有文件 (*)': 'Night-sky files (*.nef *.cr2 *.cr3 *.arw *.dng *.raf *.rw2 *.orf *.pef *.srw *.raw *.fit *.fits *.fts);;All files (*)',
     '未添加新照片：请选择支持的 RAW / FITS 文件；重复文件只保留一次。': 'No new photos added. Choose supported RAW / FITS files; duplicates are included only once.',
-    '每个任务最多选择 300 张照片，请分组处理。': 'Each job supports up to 300 photos. Split this selection into smaller groups.',
     '首帧 · ': 'First · ',
     '已选 {0} 张照片': '{0} photos selected',
     '正在准备首帧校色预览…': 'Preparing the color-corrected first-frame preview…',
@@ -751,4 +750,89 @@ EN.update({
 EN.update({
     '自动加回 {0} 条': '{0} added back automatically',
     '高优先待看 {0} 条（共 {1} 条待核实）': '{0} high priority to check ({1} unverified in all)',
+})
+
+# Meteor-shower mode, the cache estimate before start, recent tasks and the progress read-out.
+EN.update({
+    '流星雨合成': 'Meteor shower',
+    '流星雨合成 · 已打开': 'Meteor shower · on',
+    '打开“保留流星等亮迹”，下次启动仍然打开。每段照片出一张图。':
+        'Turns on “Preserve meteors and trails” and keeps it on at the next start. Each segment of photos gives one image.',
+    '· 照片里有地景时，先在 ① 标记地景。': '· If the photos show foreground, mark it in ① first.',
+    '· 每段约 30 分钟、约 150 张，先到为准；每段出一张图。':
+        '· Keep each segment to about 30 minutes or about 150 photos, whichever comes first; each segment gives one image.',
+    '· 复核完亮迹再清理缓存。': '· Clean the cache only after the trail review is done.',
+    '请等当前处理完成后再打开流星雨合成。': 'Wait for the current processing to finish, then turn on Meteor shower.',
+    '正在估算所需缓存空间…': 'Estimating the cache space needed…',
+    '暂时无法估算所需缓存：': 'Cannot estimate the cache space needed: ',
+    '空间不够，这块盘放不下一段。请在“设置 → 作品与缓存”换到更大的盘，或清理已复核的旧任务。':
+        'Not enough space: this drive cannot hold even one segment. Choose a larger drive under Settings → '
+        'Photographs and cache, or clean old jobs you have finished reviewing.',
+    '{0} 张 × 每张 {1}（转换帧 + 配准帧）+ 母版与产物 {2} + 原片副本 {3}':
+        '{0} photos × {1} each (converted + registered frame) + masters and products {2} + copies of the originals {3}',
+    ' + 范围保护试验副本 {0}': ' + highlight-range trial copies {0}',
+    '，× {0} + 余量 {1}': ', × {0} + margin {1}',
+    '读不到首帧尺寸，按原片大小估算：{0} × {1} + 余量 {2}':
+        'The first frame size cannot be read, so the estimate uses the file sizes: {0} × {1} + margin {2}',
+    '与开始时的空间检查用同一算法：': 'Same calculation as the space check at start: ',
+    '{0} · 已用 {1}': '{0} · elapsed {1}',
+    '校准镜头畸变': 'Calibrating lens distortion',
+    '寻找流星等亮迹': 'Finding meteors and trails',
+    '加回流星': 'Adding meteors back',
+    '核验素材': 'Checking photos',
+    '增强银河': 'Enhancing the Milky Way',
+    '准备继续': 'Preparing to continue',
+    '最近的任务': 'Recent jobs',
+    ' · 含亮迹': ' · with trails',
+    '还没有最近的任务': 'No recent jobs yet',
+    '清空列表': 'Clear list',
+    '打开此任务': 'Open this job',
+    '在主窗口打开所选任务：查看作品，或继续复核亮迹。':
+        'Open the selected job in the main window to view its photographs or continue the trail review.',
+    '等待当前处理或清理结束后再打开。': 'Wait for the current processing or cleaning to finish before opening.',
+    '请在列表中选择一个任务。': 'Select one job in the list.',
+    '沿用上一段的地景分区': 'Reuse the previous segment’s foreground',
+    '把上一段画好的地景边界放到这一段的首帧上，核对后使用；银河需要重新圈定。':
+        'Puts the foreground boundary drawn for the previous segment on this segment’s first frame for you to check '
+        'and use; the Milky Way has to be drawn again.',
+    '上一段的照片尺寸或方向不同，不能沿用；请重新标记。':
+        'The previous segment’s photos differ in size or orientation, so its regions cannot be reused; mark them again.',
+    '已带入上一段的地景标记；核对边界后点“使用这些分区”。':
+        'The previous segment’s foreground marks are in place; check the boundary, then click “Use these regions”.',
+})
+
+# Review fixes: the two-line cache estimate (full advice in its tooltip), the hints for the next segment, and
+# opening a remembered task that has moved.
+EN.update({
+    '已打开流星雨合成：可信的流星自动加回，其他亮迹待你复核。下次启动仍然打开。':
+        'Meteor shower is on: meteors the app is confident about are added back automatically; other trails wait '
+        'for your review. It stays on at the next start.',
+    '拍流星雨时用：可信的流星自动加回，其他亮迹待你复核；每段照片出一张图。':
+        'For meteor showers: meteors the app is confident about are added back automatically, other trails wait '
+        'for your review; each segment of photos gives one image.',
+    '· 下一段先点“清空素材”，再添加新照片。': '· For the next segment, click “Clear all” first, then add the new photos.',
+    '开始需可用约 {0} · 缓存盘可用 {1}': 'Start needs ~{0} free · cache drive has {1}',
+    '开始需可用约 {0} · 读不到可用空间': 'Start needs ~{0} free · free space unknown',
+    '空间不够：每段最多 {0} 张': 'Not enough space: at most {0} photos per segment',
+    '空间不够：每段不超过 {0} 张；复核并清理上一段的缓存后再做下一段，或在“设置 → 作品与缓存”换到更大的盘。':
+        'Not enough space: at most {0} photos per segment. Review and clean the previous segment’s cache before '
+        'the next one, or choose a larger drive under Settings → Photographs and cache.',
+    '空间不够：这块盘放不下一段': 'Not enough space: this drive cannot hold one segment',
+    '长序列建议改用 Siril 官方构建': 'Long sequence: use the official Siril build',
+    '长序列建议在“设置 → 处理后端”改用 Siril 官方构建：开始前要求的可用空间约为官方构建的 {0:.1f} 倍。':
+        'For long sequences, choose the official Siril build under Settings → Processing backends: with the '
+        'modified build, the free space required at start is about {0:.1f} times as much.',
+    '长序列建议关闭“保护堆栈高光”': 'Long sequence: turn off “Preserve stacking highlights”',
+    '长序列建议在“设置 → 处理后端”关闭“保护堆栈高光”：开始前要求的可用空间约为关闭时的 {0:.1f} 倍。':
+        'For long sequences, turn off “Preserve stacking highlights” under Settings → Processing backends: with it '
+        'on, the free space required at start is about {0:.1f} times as much.',
+    '合计 {0} 字节，含安全余量。处理中途写满磁盘会失败。':
+        'Total {0} bytes, including a safety margin. A job fails if the disk fills up while it runs.',
+    '一共 {0} 张，超过每个任务 300 张的上限，请分段处理（拍流星雨建议每段约 150 张、约 30 分钟）；每段出一张图。':
+        '{0} photos in total, more than the limit of 300 per job. Process them in segments (for meteor showers, '
+        'about 150 photos or 30 minutes each); each segment gives one image.',
+    '检查有效覆盖': 'Checking coverage',
+    '找不到这个任务：它可能已移动或删除，或所在的盘没有连接。':
+        'This job cannot be found: it may have been moved or deleted, or its drive is not connected.',
+    '所选 {0} 个任务中有 {1} 个不能清理，将跳过。': 'Of the {0} selected jobs, {1} cannot be cleaned and will be skipped.',
 })

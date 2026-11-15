@@ -161,17 +161,21 @@ def test_cleaning_runs_off_the_ui_thread_while_busy_then_refreshes(make_window, 
     assert '已释放' in page.cache_result.text()
     item = page.cache_jobs.topLevelItem(0)
     assert item.text(5) == '已清理' and item.text(4) == '—'
-    assert not item.flags() & Qt.ItemFlag.ItemIsSelectable and not page.clean_cache_button.isEnabled()
+    # A cleaned job can still be selected and opened, but never cleaned again.
+    item.setSelected(True)
+    assert not page.clean_cache_button.isEnabled() and page.open_cache_job_button.isEnabled()
 
 
-def test_refused_jobs_show_the_reason_and_cannot_be_selected(make_window, app, finished):
+def test_refused_jobs_show_the_reason_and_cannot_be_cleaned(make_window, app, finished):
     (finished['delivery'] / 'final.jpg').write_bytes(b'edited elsewhere')
     window = make_window('en')
     page = open_page(window, app)
     item = page.cache_jobs.topLevelItem(0)
     assert item.text(5).startswith('Cannot clean: ') and 'did not verify' in item.text(5)
     assert not CJK.search(item.text(5)) and item.toolTip(5) == item.text(5)
-    assert not item.flags() & Qt.ItemFlag.ItemIsSelectable
+    item.setSelected(True)                       # selectable to open it, never to clean it
+    assert page._selected_plans() == [] and not page.clean_cache_button.isEnabled()
+    assert page.open_cache_job_button.isEnabled() and page.open_cache_job_button.text() == 'Open this job'
 
 
 @pytest.mark.parametrize('language', ['zh_CN', 'en'])
@@ -202,6 +206,32 @@ def test_page_texts_have_english():
         assert text in EN and not CJK.search(EN[text]), text
 
 
+@pytest.mark.parametrize('how', ['button', 'double-click'])
+def test_open_this_job_loads_the_selected_task_and_closes_the_page(make_window, app, finished, monkeypatch, how):
+    window = make_window()
+    page = open_page(window, app)
+    opener = page.open_cache_job_button
+    assert opener.text() == '打开此任务' and not opener.isEnabled() and opener.toolTip() == '请在列表中选择一个任务。'
+    loaded = []
+    monkeypatch.setattr(window, 'load_existing_job', lambda path: loaded.append(path))
+    item = page.cache_jobs.topLevelItem(0)
+    item.setSelected(True)
+    assert opener.isEnabled()
+    window.job_state = 'running'                       # never while a job runs
+    window._update_controls()
+    assert not opener.isEnabled()
+    page.open_selected_job()
+    assert loaded == []
+    window.job_state = ''
+    window._update_controls()
+    if how == 'button':
+        opener.click()
+    else:
+        page.cache_jobs.itemDoubleClicked.emit(item, 0)
+    assert loaded == [str(finished['directory'])]
+    assert not window._advanced_dialogs['storage'].isVisible()
+
+
 @pytest.mark.parametrize('language', ['zh_CN', 'en'])
 def test_confirmation_names_the_kept_copies_of_moved_originals(make_window, app, finished, language):
     job = json.loads((finished['child'] / 'job.json').read_text(encoding='utf-8'))
@@ -217,6 +247,23 @@ def test_confirmation_names_the_kept_copies_of_moved_originals(make_window, app,
         assert not CJK.search(text) and 'kept, not deleted' not in plain
     else:
         assert '有 3 张原片已不在原来的位置' in text and '会保留，不会删除' in text and '不会删除' not in plain
+
+
+@pytest.mark.parametrize('language', ['zh_CN', 'en'])
+def test_confirmation_says_which_selected_jobs_are_skipped(make_window, app, finished, monkeypatch, language):
+    """Rows that cannot be cleaned can be selected (to open them); the confirmation counts them as skipped."""
+    window = make_window(language)
+    page = open_page(window, app)
+    plan = page.cache_jobs.topLevelItem(0).data(0, Qt.ItemDataRole.UserRole)
+    refused = {'workflow_dir': str(finished['directory'].parent / 'workflow-refused'), 'plan_id': None}
+    monkeypatch.setattr(page, '_selected_rows', lambda: [plan, refused, dict(refused)])
+    asked = []
+    monkeypatch.setattr(experience_module, 'ask_cleanup', lambda parent, text: asked.append(text) or False)
+    page.clean_selected_caches()
+    expected = ('所选 3 个任务中有 2 个不能清理，将跳过。' if language == 'zh_CN'
+                else 'Of the 3 selected jobs, 2 cannot be cleaned and will be skipped.')
+    assert len(asked) == 1 and asked[0].endswith('\n\n' + expected)
+    assert expected not in page.cleanup_confirmation([plan], 1) and expected not in page.cleanup_confirmation([plan])
 
 
 def blocking_listing(monkeypatch):

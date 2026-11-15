@@ -180,6 +180,7 @@ QLabel#field, *[role="field"] { font-weight: 400; color: %(text)s; }
 *[role="mono"] { font-family: "IBM Plex Mono", "Consolas", monospace; }
 *[role="human"] { font-family: "LXGW WenKai Lite", "Noto Sans SC", serif; font-size: 16px; }
 *[role="error"] { color: %(zhu_text)s; }
+QLabel#diskEstimate { font-size: 12px; }
 QFrame#card, *[role="card"] { border: 1px solid %(hairline)s; border-radius: 8px; background: %(surface)s; }
 *[role="panel"] { background: %(surface)s; border: none; border-left: 1px solid %(hairline)s; }
 *[role="toolbar"] { background: %(window)s; border: none; }

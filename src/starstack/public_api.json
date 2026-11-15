@@ -28,6 +28,7 @@
    "cancel_job": "(job_dir: str) -> None",
    "create_demo": "(output_root: str) -> str",
    "doctor": "(siril_path: str | None = None) -> dict",
+   "inspect_sources": "(input_dir: str | None, *, input_files: list[str] | None = None, min_count: int = 3) -> dict",
    "load_job": "(job_dir: str | pathlib.Path) -> dict",
    "recompose_transients": "(job_dir: str, *, labels: dict | None = None, overrides: dict | None = None, policy: dict | None = None, marks: list | None = None, notes: dict | None = None, layer_style: str | None = None, expected_revision: dict | None = None, default_keep_rule: str | None = None, reviewer: str | None = None) -> dict",
    "resume_job": "(job_dir: str) -> dict",
@@ -35,6 +36,9 @@
   },
   "devices": {
    "lookup": "(make: 'str | None', model: 'str | None') -> 'dict | None'"
+  },
+  "disk_budget": {
+   "estimate": "(sources: 'dict', fits_contract: 'dict | None', *, stack_range_mode: 'str' = 'legacy', range_attempts: 'int' = 3) -> 'dict'"
   },
   "editing_project": {
    "load_project": "(path)",
@@ -145,6 +149,9 @@
   "retouch_integration": {
    "build_retouch_prompt": "(*, photo_path=None, intent=None, app_root=None, gimp_path=None, component_root=None, language='zh_CN', reference_images=None) -> 'str'",
    "get_retouch_info": "(*, app_root=None, gimp_path=None, component_root=None) -> 'dict'"
+  },
+  "stack_range": {
+   "contract": "(version='1.1.0')"
   },
   "star_layer_export": {
    "export_star_layers": "(separation_result, output_root, *, allowed_root=None)"
