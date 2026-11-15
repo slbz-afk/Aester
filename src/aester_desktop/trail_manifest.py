@@ -18,10 +18,12 @@ Exposure: ``exposure_s`` is the review view's ``exptime_s``, the converted frame
 
 Original files: when Aester converted camera RAW files to DNG working copies, the job stacked the DNGs.
 The main window passes what ``raw_import.prepare_import`` returned in this session (see
-``import_sources``) and its cache folder. For stacked inputs that map does not name (after a restart),
-``with_cache_records`` asks ``raw_import.import_sources_for`` for the import records in the cache (read
-only). Either way an original is named only when the record's DNG hash equals the hash the job recorded
-for that input; otherwise the row names the stacked input. The header counts each basis.
+``import_sources``) and the cache folders to search: the one the job was made in, then the one set in
+Settings. For stacked inputs that map does not name (after a restart), ``with_cache_records`` asks
+``raw_import.import_sources_for`` for the import records in those folders (read only). Either way an
+original is named only when the record's DNG hash equals the hash the job recorded for that input;
+otherwise the row names the stacked input. The header counts each basis, and a note says that an
+original's hash named this way is the one recorded at conversion (the original is not read again).
 """
 from __future__ import annotations
 
@@ -118,33 +120,56 @@ CACHE_BASIS = "import_record_found_in_cache"
 STACKED_BASIS = "stacked_input"
 
 
-def with_cache_records(job: dict, originals: dict | None, cache_root) -> dict:
+def cache_folders(*roots) -> list:
+    """The given cache folders in order, without empty values or repeats (paths compared as Windows does)."""
+    folders, seen = [], set()
+    for root in roots:
+        if root and _path_key(root) not in seen:
+            seen.add(_path_key(root))
+            folders.append(root)
+    return folders
+
+
+def with_cache_records(job: dict, originals: dict | None, cache_roots) -> dict:
     """This session's ``originals`` plus, for stacked inputs it does not name, the import records in the cache.
 
-    ``raw_import.import_sources_for`` reads those records only (no hashing, nothing written). An entry is
-    added only when the DNG hash in the record equals the hash the job recorded for that input, and is
-    marked as found in the cache. No ``cache_root``, or a lookup that fails, adds nothing.
+    ``cache_roots``: one cache folder or a list of them, asked in order; each is asked only for the inputs
+    the folders before it did not name. The main window lists the cache folder the job was made in first,
+    then the one set in Settings (they differ when the setting changed since). ``raw_import.import_sources_for``
+    reads those records only (no hashing, nothing written). An entry is added only when the DNG hash in
+    the record equals the hash the job recorded for that input, and is marked as found in the cache. No
+    folder, or a lookup that fails, adds nothing.
     """
     merged = dict(originals or {})
-    if not cache_root:
-        return merged
+    roots = cache_folders(*(cache_roots if isinstance(cache_roots, (list, tuple)) else [cache_roots]))
     wanted = {}
     for entry in job.get("inputs") or []:
         if isinstance(entry, dict) and entry.get("path") and entry.get("sha256"):
             key = _path_key(entry["path"])
             if key not in merged:
                 wanted[key] = (str(entry["path"]), entry["sha256"])
-    if not wanted:
+    if not roots or not wanted:
         return merged
     from starstack.raw_import import import_sources_for
-    try:
-        found = import_sources_for([path for path, _ in wanted.values()], cache_root)
-    except (OSError, ValueError):
-        return merged
-    for key, entry in found.items():
-        if key in wanted and isinstance(entry, dict) and entry.get("file") and entry.get("input_sha256") == wanted[key][1]:
-            merged[key] = {**entry, "basis": CACHE_BASIS}
+    for root in roots:
+        if not wanted:
+            break
+        try:
+            found = import_sources_for([path for path, _ in wanted.values()], root)
+        except (OSError, ValueError):
+            continue
+        for key, entry in found.items():
+            if key in wanted and isinstance(entry, dict) and entry.get("file") \
+                    and entry.get("input_sha256") == wanted[key][1]:
+                merged[key] = {**entry, "basis": CACHE_BASIS}
+                del wanted[key]
     return merged
+
+
+def working_copy_rows(manifest: dict) -> int:
+    """Rows that name a stacked DNG because no matching conversion record was found."""
+    return sum(row["source_file"] == row["stacked_input"] and row["source_sha256"] == row["stacked_input_sha256"]
+               and str(row["stacked_input"]).lower().endswith(".dng") for row in manifest["rows"])
 
 
 def _original(path, sha256, originals):
@@ -274,7 +299,7 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
     """{'header': ..., 'rows': [...]} for the published trails version of this session.
 
     ``originals``: ``import_sources`` of this session's imports, with ``with_cache_records`` added when the
-    window knows its cache folder. ``zone``: the local time zone (None: this computer's).
+    window knows its cache folders. ``zone``: the local time zone (None: this computer's).
     """
     kept = published_keeps(session, workflow)
     if kept is None:
@@ -361,6 +386,8 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
     named.append((reference_path, reference_sha))
     skipped = {frame["frame_index"] for frame in header["not_scanned"]["frames"]}
     named += [(entry.get("path"), entry.get("sha256")) for number, entry in enumerate(inputs, 1) if number in skipped]
+    if any(basis != STACKED_BASIS for basis in bases):
+        header["notes"].append(tr('按转换记录写出原片名的行，source_sha256 是转换时记下的原片哈希；导出清单时没有重新读取原片。'))
     if any(_maybe_working_copy(path, sha, originals) for path, sha in named if path):
         header["notes"].append(tr('若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（没有找到与之相符的转换记录）。'))
     return {"header": header, "rows": rows}

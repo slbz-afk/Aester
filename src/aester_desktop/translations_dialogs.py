@@ -210,9 +210,13 @@ EN.update({
     '未扫描的帧（质量门剔除或未能对齐）里即使有流星，也不在本清单中。':
         'Frames that were not scanned (excluded by the quality gate or not aligned) are not covered, even if they hold meteors.',
     'exposure_s 是每行那张曝光的时长（秒，取自转换后帧的 FITS EXPTIME），没有记录时留空；exposure 是本段合计。':
-        'exposure_s is the exposure time of each row’s exposure in seconds (FITS EXPTIME of its converted frame), empty when it was not recorded; exposure gives the segment totals.',
+        'exposure_s is each row’s exposure time in seconds (FITS EXPTIME of its converted frame), empty when it was not recorded; exposure gives the segment totals.',
     '若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（没有找到与之相符的转换记录）。':
         'If camera RAW files were converted to DNG working copies when they were added, the list names the working copies: each original has the same name stem and a different hash (no matching conversion record was found).',
+    '按转换记录写出原片名的行，source_sha256 是转换时记下的原片哈希；导出清单时没有重新读取原片。':
+        'For rows that name an original from a conversion record, source_sha256 is the original’s hash recorded at conversion; the original was not read again for this list.',
+    '\n其中 {0} 条写的是叠加所用 DNG 的文件名（没有找到相符的转换记录）。':
+        '\nRows that name the stacked DNG (no matching conversion record was found): {0}.',
 })
 
 # Keep or omit everything the current filter shows (2026-11).

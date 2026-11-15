@@ -1045,16 +1045,18 @@ class TrailReviewDialog(QDialog):
     applyRequested = Signal(str)
 
     def __init__(self, session: dict, parent=None, *, workflow: dict | None = None, originals: dict | None = None,
-                 cache_root: str | None = None):
+                 cache_roots=None):
         super().__init__(parent)
         self.session = copy.deepcopy(session)
         # The workflow record (read only): which candidates its published trails version added back.
         self.workflow = copy.deepcopy(workflow) if isinstance(workflow, dict) else None
         # Original photographs behind DNG working copies made in this session (trail_manifest.import_sources).
         self.originals = dict(originals or {})
-        # The main window's cache folder: the composite list looks up the import records there for stacked
-        # inputs this session did not convert (trail_manifest.with_cache_records). None: no lookup.
-        self.cache_root = cache_root
+        # Cache folders, searched in order (the job's own, then the one in Settings): the composite list looks
+        # up the import records there for stacked inputs this session did not convert
+        # (trail_manifest.with_cache_records). One folder or a list; None: no lookup.
+        self.cache_roots = trail_manifest.cache_folders(
+            *(cache_roots if isinstance(cache_roots, (list, tuple)) else [cache_roots]))
         self.decisions = copy.deepcopy(session.get("decisions") or {})
         self._undo = []
         self._workers = []
@@ -2039,7 +2041,7 @@ class TrailReviewDialog(QDialog):
         from starstack.core import load_job
         try:
             job = load_job(self.session["job_dir"])
-            originals = trail_manifest.with_cache_records(job, self.originals, self.cache_root)
+            originals = trail_manifest.with_cache_records(job, self.originals, self.cache_roots)
             manifest = trail_manifest.build(self.session, job, self.workflow, originals=originals, zone=LOCAL_ZONE)
         except Exception as exc:
             self._set_status_error(True)
@@ -2067,7 +2069,10 @@ class TrailReviewDialog(QDialog):
             return None
         self._set_status_error(False)
         pending = len(self.decisions)
+        unnamed = trail_manifest.working_copy_rows(manifest)
         self.status.setText(tr('已导出合成清单：加回 {0} 条。\n{1}\n{2}', len(manifest["rows"]), *written) +
+                            (tr('\n其中 {0} 条写的是叠加所用 DNG 的文件名（没有找到相符的转换记录）。', unnamed)
+                             if unnamed else "") +
                             (tr('\n清单按已出图的版本；本窗口里还没应用的选择不在其中。') if pending else ""))
         return written
 

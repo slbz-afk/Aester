@@ -417,6 +417,7 @@ def test_manifest_rows_are_the_published_keeps_with_header_facts(session, tmp_pa
     assert any("线性母版" in note and "不含流星" in note for note in header["notes"])
     assert any("世界时" in note and "差整小时" in note for note in header["notes"])
     assert not any("工作副本" in note for note in header["notes"])        # NEF inputs: no working copies
+    assert not any("转换时记下" in note for note in header["notes"]) and trail_manifest.working_copy_rows(manifest) == 0
 
 
 def test_manifest_names_the_originals_behind_dng_working_copies(session, tmp_path):
@@ -447,12 +448,17 @@ def test_manifest_names_the_originals_behind_dng_working_copies(session, tmp_pat
     assert header["source_file_basis"] == {"import_record_of_this_session": 1, "import_record_found_in_cache": 0,
                                            "stacked_input": 0}
     assert not any("工作副本" in note for note in header["notes"])
+    # The original's hash comes from the record, not from reading the original again; the list says so.
+    assert any("转换时记下的原片哈希" in note and "没有重新读取原片" in note for note in header["notes"])
+    assert trail_manifest.working_copy_rows(manifest) == 0
     # Without that record (a restart), or for a DNG that changed since: the stacked DNG, said plainly.
     for known in ({}, {key: {**value, "input_sha256": "0" * 64} for key, value in originals.items()}):
         manifest = trail_manifest.build(session, job, workflow, originals=known)
         row = manifest["rows"][0]
         assert (row["source_file"], row["source_sha256"]) == ("DSC_0003.dng", f"d{3:063x}")
         assert any("工作副本" in note and "主干相同" in note for note in manifest["header"]["notes"])
+        assert not any("转换时记下" in note for note in manifest["header"]["notes"])
+        assert trail_manifest.working_copy_rows(manifest) == 1
     text = trail_manifest.csv_text(trail_manifest.build(session, job, workflow, originals=originals))
     assert not DRIVE.search(text) and "raw-imports" not in text and "shots" not in text
 
@@ -507,6 +513,7 @@ def test_manifest_after_a_restart_names_the_originals_from_the_cache_record(sess
     assert header["reference_frame"]["file"] == "DSC_0003.NEF"
     assert header["not_scanned"]["frames"][0]["file"] == "DSC_0005.NEF"
     assert not any("工作副本" in note for note in header["notes"])
+    assert any("转换时记下的原片哈希" in note for note in header["notes"])
     text = trail_manifest.csv_text(manifest)
     assert not DRIVE.search(text) and "raw-imports" not in text and "shots" not in text
     # Without a cache folder nothing is looked up.
@@ -553,6 +560,44 @@ def test_this_sessions_conversions_win_and_the_cache_is_asked_only_for_the_rest(
         raise OSError("offline")
     monkeypatch.setattr(raw_import, "import_sources_for", offline)
     assert trail_manifest.with_cache_records(job, mine, cache) == mine
+
+
+def test_the_jobs_own_cache_folder_is_asked_before_the_one_in_settings(session, tmp_path, monkeypatch):
+    """The cache setting changed after the job ran: the job's inputs lie under the folder it was made in."""
+    from starstack import raw_import
+    cache, job = _cached_job(tmp_path, session)
+    settings = tmp_path / "new cache"
+    settings.mkdir()
+    paths = [entry["path"] for entry in job["inputs"]]
+    # Only the folder set in Settings now: no record there, so the list would name the DNG working copies.
+    assert trail_manifest.with_cache_records(job, {}, [str(settings)]) == {}
+    calls, real = [], raw_import.import_sources_for
+    monkeypatch.setattr(raw_import, "import_sources_for",
+                        lambda paths, root: calls.append((paths, root)) or real(paths, root))
+    # The job's own folder first: everything is named there and the Settings folder is not asked.
+    found = trail_manifest.with_cache_records(job, {}, trail_manifest.cache_folders(str(cache), str(settings)))
+    assert len(found) == 5 and all(entry["basis"] == "import_record_found_in_cache" for entry in found.values())
+    assert calls == [(paths, str(cache))]
+    # Each later folder is asked only for the inputs the earlier ones did not name.
+    calls.clear()
+    job["inputs"][1]["sha256"] = "0" * 64                  # the record no longer matches this input
+    found = trail_manifest.with_cache_records(job, {}, [str(cache), str(settings)])
+    assert len(found) == 4 and calls == [(paths, str(cache)), ([paths[1]], str(settings))]
+    # In the other order the Settings folder finds nothing and the job's folder still names the rest.
+    calls.clear()
+    assert len(trail_manifest.with_cache_records(job, {}, [str(settings), str(cache)])) == 4
+    assert calls == [(paths, str(settings)), (paths, str(cache))]
+    # A folder that fails is passed over; the same folder given twice is asked once.
+    calls.clear()
+
+    def flaky(paths, root):
+        if root == "offline":
+            raise OSError("offline")
+        return real(paths, root)
+    monkeypatch.setattr(raw_import, "import_sources_for", lambda paths, root: calls.append(root) or flaky(paths, root))
+    assert len(trail_manifest.with_cache_records(job, {}, ["offline", str(cache), str(cache).upper(), None])) == 4
+    assert calls == ["offline", str(cache)] if os.name == "nt" else calls[:2] == ["offline", str(cache)]
+    assert trail_manifest.cache_folders(None, "", str(cache), str(cache)) == [str(cache)]
 
 
 def test_manifest_keep_source_is_the_published_one_not_the_draft(session, tmp_path):
@@ -649,20 +694,34 @@ def test_export_after_a_restart_names_the_originals_from_the_cache(make, session
     workflow = _workflow(tmp_path, session, ["light_00003-1"])
     (tmp_path / "lists").mkdir()
     before = _snapshot(cache)
-    view = make(session, workflow=workflow, originals={}, cache_root=str(cache))
+    # The Settings folder changed since the job ran; the job's own cache folder comes first and names it.
+    (tmp_path / "new cache").mkdir()
+    view = make(session, workflow=workflow, originals={}, cache_roots=[str(cache), str(tmp_path / "new cache")])
     csv_path, json_path = view.export_manifest(tmp_path / "lists" / "after-restart.csv")
     data = json.loads(json_path.read_text(encoding="utf-8"))
     assert (data["rows"][0]["source_file"], data["rows"][0]["stacked_input"]) == ("DSC_0003.NEF", "DSC_0003.dng")
     assert data["header"]["source_file_basis"]["import_record_found_in_cache"] == 1
     assert data["rows"][0]["exposure_s"] == 10.0 and _snapshot(cache) == before
     assert "raw-imports" not in csv_path.read_text(encoding="utf-8-sig")
-    # Without a cache folder: the stacked working copy, said plainly.
-    plain = make(session, workflow=workflow)
-    written = plain.export_manifest(tmp_path / "lists" / "plain.csv")
-    data = json.loads(written[1].read_text(encoding="utf-8"))
-    assert data["rows"][0]["source_file"] == "DSC_0003.dng"
-    assert data["header"]["source_file_basis"] == {"import_record_of_this_session": 0,
-                                                   "import_record_found_in_cache": 0, "stacked_input": 1}
+    assert "加回 1 条" in view.status.text() and "DNG 的文件名" not in view.status.text()
+    # One folder may be given on its own.
+    assert make(session, workflow=workflow, cache_roots=str(cache)).cache_roots == [str(cache)]
+    # Without a cache folder, or only one that holds no record: the stacked working copy, said plainly, and the
+    # status line says so too (the user need not open the file to find out).
+    for roots in (None, [str(tmp_path / "new cache")]):
+        plain = make(session, workflow=workflow, cache_roots=roots)
+        written = plain.export_manifest(tmp_path / "lists" / "plain.csv", confirm_overwrite=lambda name: True)
+        data = json.loads(written[1].read_text(encoding="utf-8"))
+        assert data["rows"][0]["source_file"] == "DSC_0003.dng"
+        assert data["header"]["source_file_basis"] == {"import_record_of_this_session": 0,
+                                                       "import_record_found_in_cache": 0, "stacked_input": 1}
+        assert "其中 1 条写的是叠加所用 DNG 的文件名（没有找到相符的转换记录）。" in plain.status.text()
+    i18n.set_language("en")
+    try:
+        plain.export_manifest(tmp_path / "lists" / "plain.csv", confirm_overwrite=lambda name: True)
+        assert "Rows that name the stacked DNG (no matching conversion record was found): 1." in plain.status.text()
+    finally:
+        i18n.set_language("zh_CN")
 
 
 def test_export_is_disabled_without_a_trails_version(make, session):
