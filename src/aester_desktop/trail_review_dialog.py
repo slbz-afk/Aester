@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushB
                               QComboBox, QTreeWidget, QTreeWidgetItem, QSplitter, QCheckBox,
                               QWidget, QAbstractItemView, QMessageBox, QGridLayout, QButtonGroup,
                               QStyledItemDelegate, QStyleOptionViewItem, QStyle, QApplication,
-                              QScrollArea, QFrame, QFileDialog)
+                              QScrollArea, QFrame, QFileDialog, QMenu)
 
 from starstack import overlay_colors as oc
 from . import themes
@@ -996,6 +996,16 @@ class TrailReviewDialog(QDialog):
         self.undo_button = _button(tr('撤销上一步'), 'ghost')
         self.undo_button.clicked.connect(self.undo)
         controls.addWidget(self.undo_button)
+        # Every row the current filter shows at once (asks first; one undo step restores it).
+        self.bulk_button = _button(tr('当前筛选全部…'), 'ghost')
+        self.bulk_button.setToolTip(tr('对当前筛选显示的全部候选一次设为保留或不加回；先选一个筛选。'))
+        bulk = QMenu(self.bulk_button)
+        self.bulk_keep_action = bulk.addAction(tr('全部保留…'))
+        self.bulk_keep_action.triggered.connect(lambda: self.bulk_choice("keep"))
+        self.bulk_omit_action = bulk.addAction(tr('全部不加回…'))
+        self.bulk_omit_action.triggered.connect(lambda: self.bulk_choice("omit"))
+        self.bulk_button.setMenu(bulk)
+        controls.addWidget(self.bulk_button)
         controls.addStretch(1)
         layout.addLayout(controls)
         footer = QHBoxLayout()
@@ -1630,6 +1640,7 @@ class TrailReviewDialog(QDialog):
                 item.setSelected(False)
         self.location.set_visible(None if len(shown) == len(self._items) else shown)
         self.filter_count.setText(tr('显示 {0} / {1} 条', len(shown), len(self._items)) if self._items else "")
+        self.bulk_button.setEnabled(self._filtering() and bool(shown))
         current = self.list.currentItem()
         if current is not None and current.isHidden():
             order = self.shown_order()
@@ -1740,6 +1751,32 @@ class TrailReviewDialog(QDialog):
             if self._filtering():
                 self._pinned.add(cid)
         self._refresh_decisions()
+
+    def bulk_choice(self, action, confirm=None):
+        """Keep or omit every row the current filter shows, after asking; one undo step restores it."""
+        ids = self.shown_order()
+        if not self._filtering() or not ids:
+            self.status.setText(tr('先选一个筛选，再对筛选结果整批设置。'))
+            return False
+        if not (confirm or self._confirm_bulk)(action, len(ids)):
+            return False
+        self._choose(ids, "unchanged", action)
+        self.status.setText(tr('已把当前筛选的 {0} 条设为“{1}”；“撤销上一步”可恢复。', len(ids), tr(ACTIONS[action])))
+        return True
+
+    def _confirm_bulk(self, action, count):
+        buttons = QMessageBox.StandardButton
+        if action == "keep":
+            text = tr('把当前筛选的 {0} 条全部设为保留？\n没看过的候选里可能有飞机或卫星，保留后会加进含亮迹版本。“撤销上一步”可恢复。', count)
+        else:
+            text = tr('把当前筛选的 {0} 条全部设为不加回？\n“撤销上一步”可恢复。', count)
+        box = QMessageBox(themes.message_icon(self), tr('整批设置'), text, buttons.Ok | buttons.Cancel, self)
+        box.button(buttons.Ok).setText(tr('全部保留') if action == "keep" else tr('全部不加回'))
+        box.button(buttons.Cancel).setText(tr('取消'))
+        box.setDefaultButton(buttons.Cancel)
+        box.setEscapeButton(buttons.Cancel)
+        box.exec()
+        return box.clickedButton() is box.button(buttons.Ok)
 
     def clear_selected_decisions(self):
         items = [item for item in self.list.selectedItems() if not item.isHidden()]

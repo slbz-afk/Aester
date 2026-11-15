@@ -371,3 +371,46 @@ def test_manifest_from_a_real_review_session(job_directory, tmp_path):  # noqa: 
     assert manifest["rows"][0]["source_file"] == "frame-1.nef" and manifest["rows"][0]["keep_source"] == "human"
     assert not DRIVE.search(trail_manifest.csv_text(manifest))
     assert not DRIVE.search(json.dumps(manifest, ensure_ascii=False))
+
+
+# ---- everything the current filter shows ---------------------------------------------------------
+
+def test_bulk_choice_needs_a_filter_asks_first_and_undoes_in_one_step(make, session):
+    view = make(session)
+    asked = []
+    assert not view.bulk_button.isEnabled()
+    assert not view.bulk_choice("keep", confirm=lambda *a: asked.append(a) or True) and not asked
+    view.set_priority_filter("high")
+    assert view.bulk_button.isEnabled()
+    assert not view.bulk_choice("keep", confirm=lambda *a: asked.append(a) or False)       # declined
+    assert asked == [("keep", 2)] and view.decisions == {}
+    assert view.bulk_choice("keep", confirm=lambda *a: True)
+    assert view.decisions == {"light_00002-1": {"override": "keep"}, "light_00004-1": {"override": "keep"}}
+    assert "2 条" in view.status.text()
+    # Everything not added back, set in one step; one undo restores it.
+    view.set_priority_filter(None)
+    view.set_keep_filter("omit")
+    assert sorted(view.visible_ids()) == ["light_00001-1", "light_00002-2"]
+    assert view.bulk_choice("omit", confirm=lambda *a: True)
+    assert {cid for cid, d in view.decisions.items() if d.get("override") == "omit"} == set(view.visible_ids())
+    view.undo()
+    assert view.decisions == {"light_00002-1": {"override": "keep"}, "light_00004-1": {"override": "keep"}}
+    view.undo()
+    assert view.decisions == {}
+
+
+def test_bulk_confirmation_defaults_to_cancel(make, session, monkeypatch, app):
+    from PySide6.QtCore import QTimer
+    from PySide6.QtWidgets import QMessageBox
+    view = make(session)
+    view.set_priority_filter("high")
+    seen = []
+
+    def answer():
+        box = next(w for w in QApplication.topLevelWidgets() if isinstance(w, QMessageBox) and w.isVisible())
+        seen.append((box.defaultButton().text(), [b.text() for b in box.buttons()], box.text()))
+        box.defaultButton().click()
+    QTimer.singleShot(0, answer)
+    assert not view.bulk_choice("keep")
+    assert seen and seen[0][0] == "取消" and "全部保留" in seen[0][1] and "飞机或卫星" in seen[0][2]
+    assert view.decisions == {}

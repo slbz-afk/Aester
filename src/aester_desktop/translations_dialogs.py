@@ -207,3 +207,19 @@ EN.update({
     '单张曝光时长不在复核数据里，各行暂不填写；本段合计见 exposure。':
         'Single-exposure times are not in the review data, so the rows leave them empty; see exposure for the segment totals.',
 })
+
+# Keep or omit everything the current filter shows (2026-11).
+EN.update({
+    '当前筛选全部…': 'Everything in filter…',
+    '对当前筛选显示的全部候选一次设为保留或不加回；先选一个筛选。':
+        'Keep, or do not add back, every candidate the current filter shows. Choose a filter first.',
+    '全部保留…': 'Keep all…', '全部不加回…': 'Add none back…',
+    '全部保留': 'Keep all', '全部不加回': 'Add none back', '整批设置': 'Set in one step',
+    '先选一个筛选，再对筛选结果整批设置。': 'Choose a filter first, then set everything it shows.',
+    '已把当前筛选的 {0} 条设为“{1}”；“撤销上一步”可恢复。':
+        'Set {0} candidates in this filter to “{1}”. Undo last change restores them.',
+    '把当前筛选的 {0} 条全部设为保留？\n没看过的候选里可能有飞机或卫星，保留后会加进含亮迹版本。“撤销上一步”可恢复。':
+        'Keep all {0} candidates in this filter?\nCandidates you have not looked at may be aircraft or satellites; kept ones are added to the version with trails. Undo last change restores them.',
+    '把当前筛选的 {0} 条全部设为不加回？\n“撤销上一步”可恢复。':
+        'Add none of the {0} candidates in this filter back?\nUndo last change restores them.',
+})
