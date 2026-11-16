@@ -51,6 +51,15 @@ STAGE_LABELS = {
 STYLESHEET = themes.stylesheet(themes.DEFAULT_THEME)
 
 
+def nox_download_offered() -> bool:
+    """Read-only: whether this build's manifest publishes a nox model download; nothing is downloaded."""
+    try:
+        from starstack.components import nox_install_info
+        return bool(nox_install_info()['available'])
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+
+
 class _WorkerSignals(QObject):
     finished = Signal(str, object)
     failed = Signal(str, str)
@@ -1103,6 +1112,14 @@ class MainWindow(QMainWindow):
         self.stars_enabled = QCheckBox(tr('整理星点'))
         self.stars_enabled.setObjectName("starsEnabled")
         left.addWidget(self.stars_enabled)
+        # A build whose manifest publishes no nox download cannot run star reduction unless the user chose a
+        # verified model in Settings; _update_controls then disables the box and shows this one line.
+        self._nox_offered = nox_download_offered()
+        self.stars_unavailable_note = self._label(tr('此版本不提供去星模型，整理星点暂不可用。'))
+        self.stars_unavailable_note.setObjectName("starsUnavailableNote")
+        themes.set_role(self.stars_unavailable_note, "hint")
+        self.stars_unavailable_note.hide()
+        left.addWidget(self.stars_unavailable_note)
         self.workflow_star_panel = QWidget()
         self.workflow_star_panel.setObjectName("workflowStarPanel")
         star_options = QVBoxLayout(self.workflow_star_panel)
@@ -2883,6 +2900,14 @@ class MainWindow(QMainWindow):
                         self.stars_enabled, self.warmth_slider, self.tint_slider, self.exposure_slider,
                         self.reset_color_button):
             control.setEnabled(idle)
+        # Star reduction needs a model: a published nox download or one the user chose in Settings. Without
+        # either the box stays off; one already ticked (an older project) stays clickable so it can be cleared.
+        stars_possible = self._nox_offered or bool(self.star_model_path.text().strip())
+        self.stars_enabled.setEnabled(idle and (stars_possible or self.stars_enabled.isChecked()))
+        self.stars_unavailable_note.setVisible(not stars_possible)
+        self.stars_enabled.setToolTip('' if stars_possible else
+                                      tr('nox 模型的训练数据权利还在核查，此版本不提供下载。'
+                                         '已有本项目核验的转换模型时，可在“设置 → 组件与提示词管理”选择并准备。'))
         color_available = not self.input_files or Path(self.input_files[0]).suffix.lower() in RAW
         for control in (self.warmth_slider, self.tint_slider, self.exposure_slider, self.reset_color_button):
             control.setEnabled(idle and color_available)
