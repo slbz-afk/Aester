@@ -28,6 +28,8 @@ SETTINGS_KEYS = (
     "retouch/gimp_path", "appearance/surround", "appearance/night",
     # 2026-10-09: the JPEG quality slider.
     "output/jpeg_quality",
+    # 2026-11-15: meteor-shower mode and the recent-jobs list (File → 最近的任务; it holds cache folder paths).
+    "effects/meteor_shower", "history/recent_workflows",
 )
 _HASH = re.compile(r"[a-f0-9]{64}\Z")
 # Same fixed allowlist as storage.EXTRA_IMAGES (kept local: stdlib-only bootstrap).

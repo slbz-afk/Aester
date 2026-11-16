@@ -13,9 +13,17 @@ in UT. For camera RAW, Siril converts the camera's clock time to UT with the pro
 zone, so converting it back with this computer's zone gives the camera clock when the camera, the
 processing computer and this computer use the same zone.
 
+Exposure: ``exposure_s`` is the review view's ``exptime_s``, the converted frame's FITS EXPTIME in seconds
+(empty when it was not recorded); the header keeps the segment totals.
+
 Original files: when Aester converted camera RAW files to DNG working copies, the job stacked the DNGs.
 The main window passes what ``raw_import.prepare_import`` returned in this session (see
-``import_sources``) so each row can name the original; without it the row names the stacked input.
+``import_sources``) and the cache folders to search: the one the job was made in, then the one set in
+Settings. For stacked inputs that map does not name (after a restart), ``with_cache_records`` asks
+``raw_import.import_sources_for`` for the import records in those folders (read only). Either way an
+original is named only when the record's DNG hash equals the hash the job recorded for that input;
+otherwise the row names the stacked input. The header counts each basis, and a note says that an
+original's hash named this way is the one recorded at conversion (the original is not read again).
 """
 from __future__ import annotations
 
@@ -31,11 +39,11 @@ from pathlib import Path
 from starstack import PRODUCT_VERSION
 from starstack.i18n import tr
 
-FORMAT = "aester-composite-list-2"
+FORMAT = "aester-composite-list-3"
 KINDS = ("algorithm", "human", "agent")
 CLASSES = ("meteor", "satellite", "aircraft", "artifact", "unknown")
 COLUMNS = ("id", "source_file", "source_sha256", "frame_index", "capture_time_local", "capture_time_utc",
-           "x1", "y1", "x2", "y2", "source_x1", "source_y1", "source_x2", "source_y2",
+           "exposure_s", "x1", "y1", "x2", "y2", "source_x1", "source_y1", "source_x2", "source_y2",
            "identity", "identity_source", "keep_source", "stacked_input", "stacked_input_sha256")
 TIME_BASIS = ("FITS DATE-OBS (UT). For camera RAW, Siril writes it from the camera's clock time using the "
               "processing computer's time zone; capture_time_local converts it back with this computer's time zone.")
@@ -106,17 +114,76 @@ def import_sources(result) -> dict:
     return found
 
 
+# How a row's source_file was found (header source_file_basis counts each).
+SESSION_BASIS = "import_record_of_this_session"
+CACHE_BASIS = "import_record_found_in_cache"
+STACKED_BASIS = "stacked_input"
+
+
+def cache_folders(*roots) -> list:
+    """The given cache folders in order, without empty values or repeats (paths compared as Windows does)."""
+    folders, seen = [], set()
+    for root in roots:
+        if root and _path_key(root) not in seen:
+            seen.add(_path_key(root))
+            folders.append(root)
+    return folders
+
+
+def with_cache_records(job: dict, originals: dict | None, cache_roots) -> dict:
+    """This session's ``originals`` plus, for stacked inputs it does not name, the import records in the cache.
+
+    ``cache_roots``: one cache folder or a list of them, asked in order; each is asked only for the inputs
+    the folders before it did not name. The main window lists the cache folder the job was made in first,
+    then the one set in Settings (they differ when the setting changed since). ``raw_import.import_sources_for``
+    reads those records only (no hashing, nothing written). An entry is added only when the DNG hash in
+    the record equals the hash the job recorded for that input, and is marked as found in the cache. No
+    folder, or a lookup that fails, adds nothing.
+    """
+    merged = dict(originals or {})
+    roots = cache_folders(*(cache_roots if isinstance(cache_roots, (list, tuple)) else [cache_roots]))
+    wanted = {}
+    for entry in job.get("inputs") or []:
+        if isinstance(entry, dict) and entry.get("path") and entry.get("sha256"):
+            key = _path_key(entry["path"])
+            if key not in merged:
+                wanted[key] = (str(entry["path"]), entry["sha256"])
+    if not roots or not wanted:
+        return merged
+    from starstack.raw_import import import_sources_for
+    for root in roots:
+        if not wanted:
+            break
+        try:
+            found = import_sources_for([path for path, _ in wanted.values()], root)
+        except (OSError, ValueError):
+            continue
+        for key, entry in found.items():
+            if key in wanted and isinstance(entry, dict) and entry.get("file") \
+                    and entry.get("input_sha256") == wanted[key][1]:
+                merged[key] = {**entry, "basis": CACHE_BASIS}
+                del wanted[key]
+    return merged
+
+
+def working_copy_rows(manifest: dict) -> int:
+    """Rows that name a stacked DNG because no matching conversion record was found."""
+    return sum(row["source_file"] == row["stacked_input"] and row["source_sha256"] == row["stacked_input_sha256"]
+               and str(row["stacked_input"]).lower().endswith(".dng") for row in manifest["rows"])
+
+
 def _original(path, sha256, originals):
-    """(file, sha256, known) of the photograph behind one stacked input."""
+    """(file, sha256, basis) of the photograph behind one stacked input."""
     entry = (originals or {}).get(_path_key(path)) if path else None
     if entry and sha256 and entry.get("input_sha256") == sha256:
-        return entry["file"], entry.get("sha256") or "", True
-    return file_name(path), sha256 or "", False
+        basis = CACHE_BASIS if entry.get("basis") == CACHE_BASIS else SESSION_BASIS
+        return entry["file"], entry.get("sha256") or "", basis
+    return file_name(path), sha256 or "", STACKED_BASIS
 
 
 def _maybe_working_copy(path, sha256, originals) -> bool:
-    """A stacked DNG without an import record of this session: possibly a working copy of a camera RAW."""
-    return not _original(path, sha256, originals)[2] and file_name(path).lower().endswith(".dng")
+    """A stacked DNG without a matching import record: possibly a working copy of a camera RAW."""
+    return _original(path, sha256, originals)[2] == STACKED_BASIS and file_name(path).lower().endswith(".dng")
 
 
 def _frame_number(stem):
@@ -129,6 +196,12 @@ def _number(value):
     if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value):
         return None
     return value
+
+
+def _seconds(value):
+    """A positive, finite exposure time in seconds, or None."""
+    value = _number(value)
+    return value if value is not None and value > 0 else None
 
 
 def _point_pairs(points):
@@ -225,8 +298,8 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
           now: datetime | None = None, zone=None) -> dict:
     """{'header': ..., 'rows': [...]} for the published trails version of this session.
 
-    ``originals``: ``import_sources`` of this session's imports. ``zone``: the local time zone (None: this
-    computer's).
+    ``originals``: ``import_sources`` of this session's imports, with ``with_cache_records`` added when the
+    window knows its cache folders. ``zone``: the local time zone (None: this computer's).
     """
     kept = published_keeps(session, workflow)
     if kept is None:
@@ -237,16 +310,17 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
     if missing:
         raise ValueError(tr('加回记录里的候选不在当前复核数据中，不能导出合成清单。'))
     drafts = session.get("decisions") or {}
-    rows = []
+    rows, bases = [], []
     for cid in kept:
         c = by_id[cid]
         identity, identity_source = _published_identity(c)
         image = _point_pairs(c.get("endpoints_native_reference"))
         source = _point_pairs(c.get("endpoints_native_source"))
-        original, original_sha, _ = _original(c.get("input"), c.get("input_sha256"), originals)
+        original, original_sha, basis = _original(c.get("input"), c.get("input_sha256"), originals)
+        bases.append(basis)
         utc, local = _times(c.get("date_obs"), zone)
         rows.append(dict(zip(COLUMNS, (
-            cid, original, original_sha, c.get("frame_index"), local, utc,
+            cid, original, original_sha, c.get("frame_index"), local, utc, _seconds(c.get("exptime_s")),
             *image, *source, identity, identity_source, _published_keep_source(c, bool(drafts.get(cid))),
             file_name(c.get("input")), c.get("input_sha256") or ""))))
     rows.sort(key=lambda row: (row["frame_index"] or 0, row["id"]))
@@ -274,9 +348,7 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
         "candidate_revision": (session.get("base_revision") or {}).get("id"),
         "added_back": len(rows), "added_back_by": by,
         "capture_time_basis": TIME_BASIS, "capture_time_local_zone": utc_offset(shown_zone),
-        "source_file_basis": {"import_record_of_this_session": sum(row["source_file"] != row["stacked_input"]
-                                                                   for row in rows),
-                              "stacked_input": sum(row["source_file"] == row["stacked_input"] for row in rows)},
+        "source_file_basis": {basis: bases.count(basis) for basis in (SESSION_BASIS, CACHE_BASIS, STACKED_BASIS)},
         "reference_frame": {
             "file": _original(reference_path, reference_sha, originals)[0], "stacked_input": file_name(reference_path),
             "frame_index": reference_number,
@@ -293,7 +365,8 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
             "capture_time_from": "candidates_only: frames without candidates carry no recorded time here"},
         "exposure": {"input_total_s": exposure.get("input_total_seconds"),
                      "stacked_total_s": exposure.get("included_total_seconds"),
-                     "per_frame": "not in the review data"},
+                     "per_row": "exposure_s: the row's exposure time in seconds (FITS EXPTIME of its converted "
+                                "frame); empty when it was not recorded"},
         "not_scanned": _not_scanned(job, originals),
         "coordinates": {"image": "x1..y2: output photograph pixels, zero-based pixel centres, origin top left"
                                  + ("" if not request.get("image_rotation") else ", before the requested rotation"),
@@ -306,15 +379,17 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
             tr('含亮迹版本里的线性母版（master_scene_linear.tif）不含流星；流星只加在成片（final_srgb16.tif、final.jpg）里。'),
             tr('身份是算法建议或复核者的选择，不是认证；同一张曝光的一颗流星可能有多条候选。'),
             tr('未扫描的帧（质量门剔除或未能对齐）里即使有流星，也不在本清单中。'),
-            tr('单张曝光时长不在复核数据里；exposure 只有本段合计。'),
+            tr('exposure_s 是每行那张曝光的时长（秒，取自转换后帧的 FITS EXPTIME），没有记录时留空；exposure 是本段合计。'),
         ],
     }
     named = [(by_id[cid].get("input"), by_id[cid].get("input_sha256")) for cid in kept]
     named.append((reference_path, reference_sha))
     skipped = {frame["frame_index"] for frame in header["not_scanned"]["frames"]}
     named += [(entry.get("path"), entry.get("sha256")) for number, entry in enumerate(inputs, 1) if number in skipped]
+    if any(basis != STACKED_BASIS for basis in bases):
+        header["notes"].append(tr('按转换记录写出原片名的行，source_sha256 是转换时记下的原片哈希；导出清单时没有重新读取原片。'))
     if any(_maybe_working_copy(path, sha, originals) for path, sha in named if path):
-        header["notes"].append(tr('若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（这次没有可用的转换记录）。'))
+        header["notes"].append(tr('若加入照片时相机 RAW 被转成了 DNG 工作副本，清单里写的是工作副本的文件名：原片文件名主干相同，哈希不同（没有找到与之相符的转换记录）。'))
     return {"header": header, "rows": rows}
 
 

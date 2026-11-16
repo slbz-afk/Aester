@@ -432,7 +432,8 @@ class MainWindow(QMainWindow):
         self.input_files: list[str] = []
         self._import_originals: dict[str, str] = {}
         # Every RAW-to-DNG conversion of this session (stacked DNG -> original name and hashes), kept across
-        # selections so a composite list can name the photographs the user shot.
+        # selections so a composite list can name the photographs the user shot. After a restart the list
+        # finds earlier sessions' records in the cache folders instead (trail_manifest.with_cache_records).
         self._import_sources: dict[str, dict] = {}
         self._import_cancel = None
         self._finite_backend_info = {}
@@ -2833,12 +2834,21 @@ class MainWindow(QMainWindow):
         self._update_controls()
 
         def opened(session):
+            from aester_desktop.trail_manifest import cache_folders
             from aester_desktop.trail_review_dialog import TrailReviewDialog
             self._busy = False
             self._update_controls()
             if self.workflow_dir != directory:
                 return
-            dialog = TrailReviewDialog(session, self, workflow=self._workflow, originals=self._import_sources)
+            # Where the import records of earlier sessions are: the cache folder this job was made in
+            # (submit_workflow makes <cache>/workflow-<id>), then the one set in Settings now. They differ when
+            # the setting changed since: existing jobs stay where they were made.
+            try:
+                settings_root = self._processing_root()
+            except ValueError:
+                settings_root = None
+            dialog = TrailReviewDialog(session, self, workflow=self._workflow, originals=self._import_sources,
+                                       cache_roots=cache_folders(str(Path(directory).parent), settings_root))
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self.message_label.setText(tr('亮迹复核已关闭；已保存草稿可继续编辑。'))
                 return

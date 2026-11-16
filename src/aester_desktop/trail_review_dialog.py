@@ -279,6 +279,14 @@ def _file_name(path) -> str:
     return re.split(r"[\\/]", str(path))[-1] if path else ""
 
 
+def _exposure_text(candidate) -> str:
+    """' · 曝光 10 秒' from the view's exptime_s (FITS EXPTIME); empty when it is not recorded."""
+    seconds = _finite(candidate.get("exptime_s"))
+    if seconds is None or seconds <= 0:
+        return ""
+    return " · " + tr('曝光 {0} 秒', f"{seconds:g}")
+
+
 def _candidate_title(candidate):
     return tr('第') + str(candidate.get("frame_index", "")) + tr('张 · 候选') + candidate["id"].rsplit("-", 1)[-1]
 
@@ -1036,13 +1044,19 @@ class TrailReviewDialog(QDialog):
     """
     applyRequested = Signal(str)
 
-    def __init__(self, session: dict, parent=None, *, workflow: dict | None = None, originals: dict | None = None):
+    def __init__(self, session: dict, parent=None, *, workflow: dict | None = None, originals: dict | None = None,
+                 cache_roots=None):
         super().__init__(parent)
         self.session = copy.deepcopy(session)
         # The workflow record (read only): which candidates its published trails version added back.
         self.workflow = copy.deepcopy(workflow) if isinstance(workflow, dict) else None
         # Original photographs behind DNG working copies made in this session (trail_manifest.import_sources).
         self.originals = dict(originals or {})
+        # Cache folders, searched in order (the job's own, then the one in Settings): the composite list looks
+        # up the import records there for stacked inputs this session did not convert
+        # (trail_manifest.with_cache_records). One folder or a list; None: no lookup.
+        self.cache_roots = trail_manifest.cache_folders(
+            *(cache_roots if isinstance(cache_roots, (list, tuple)) else [cache_roots]))
         self.decisions = copy.deepcopy(session.get("decisions") or {})
         self._undo = []
         self._workers = []
@@ -2026,8 +2040,9 @@ class TrailReviewDialog(QDialog):
         """
         from starstack.core import load_job
         try:
-            manifest = trail_manifest.build(self.session, load_job(self.session["job_dir"]), self.workflow,
-                                            originals=self.originals, zone=LOCAL_ZONE)
+            job = load_job(self.session["job_dir"])
+            originals = trail_manifest.with_cache_records(job, self.originals, self.cache_roots)
+            manifest = trail_manifest.build(self.session, job, self.workflow, originals=originals, zone=LOCAL_ZONE)
         except Exception as exc:
             self._set_status_error(True)
             self.status.setText(translate_message(str(exc)))
@@ -2054,7 +2069,10 @@ class TrailReviewDialog(QDialog):
             return None
         self._set_status_error(False)
         pending = len(self.decisions)
+        unnamed = trail_manifest.working_copy_rows(manifest)
         self.status.setText(tr('已导出合成清单：加回 {0} 条。\n{1}\n{2}', len(manifest["rows"]), *written) +
+                            (tr('\n其中 {0} 条写的是叠加所用 DNG 的文件名（没有找到相符的转换记录）。', unnamed)
+                             if unnamed else "") +
                             (tr('\n清单按已出图的版本；本窗口里还没应用的选择不在其中。') if pending else ""))
         return written
 
@@ -2081,7 +2099,7 @@ class TrailReviewDialog(QDialog):
         review = candidate.get("recall_review") or {}
         # The file name only: a full path does not wrap in the side panel (it stays in the tooltip).
         self.summary.setText(tr("{0} · {1}\n已记录身份：{2}；是否加回：{3}。 ",
-                             cid, _file_name(candidate.get('input')),
+                             cid, _file_name(candidate.get('input')) + _exposure_text(candidate),
                              tr(LABELS[self._recorded_identity(candidate)]),
                              self._recorded_disposition(candidate)) + record_text(review.get("message") or ""))
         self.summary.setToolTip(str(candidate.get('input') or ''))

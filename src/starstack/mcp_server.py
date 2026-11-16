@@ -1370,7 +1370,8 @@ def create_server(workspace: WorkspaceTools | None = None):
         """打开当前完整任务的亮迹候选和草稿，含整图位置、建议身份/处置与来源；保留session_path、base_revision和draft_revision用于后续复核。未知不是卫星。
 
         application_policy_version=meteor-default-keep-1 时量测可靠的流星默认保留；每条候选含 identity/identity_source
-        （human/agent/algorithm）、default_keep、effective_keep（含已存草稿，明确覆盖优先）与 keep_source；options.export_trail_layer；
+        （human/agent/algorithm）、default_keep、effective_keep（含已存草稿，明确覆盖优先）与 keep_source，
+        以及 exptime_s（该张曝光的时长，秒，取自转换后帧的 FITS EXPTIME；没有记录或读不出时为 null）；options.export_trail_layer；
         preview_path 优先当前含亮迹成片，base_preview_path 为不含亮迹的基础成片。
         review_png 是扫描时生成的缩略图，未核对此后是否被改动（见各候选 preview_note），仅供浏览；判断以
         trail_candidate_context 的实际曝光对照为准。"""

@@ -389,7 +389,8 @@ def test_fresh_window_writes_no_viewing_preferences_until_close(make, app, tmp_p
 
 
 def test_uninstall_cleanup_owns_the_new_preference_keys():
-    for key in ("appearance/surround", "appearance/night", "retouch/gimp_path", "output/jpeg_quality"):
+    for key in ("appearance/surround", "appearance/night", "retouch/gimp_path", "output/jpeg_quality",
+                "effects/meteor_shower", "history/recent_workflows"):
         assert key in uninstall_options.SETTINGS_KEYS
 
 

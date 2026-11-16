@@ -53,11 +53,11 @@ def beijing(monkeypatch):
 
 
 def _candidate(cid, frame, *, status="omitted_unverified", priority="low", label="unknown", snr=None,
-               length=None, date=None, measured=True):
+               length=None, date=None, measured=True, exposure=10.0):
     return {"id": cid, "frame_index": frame, "input": f"C:\\Users\\someone\\shots\\DSC_{frame:04d}.NEF",
             "input_sha256": f"{frame:064x}", "status": "measured" if measured else "too_short",
             "suggestion": {"class": label}, "effective_label": label, "decision": "omit",
-            "total_snr": snr, "length_px": length, "date_obs": date,
+            "total_snr": snr, "length_px": length, "date_obs": date, "exptime_s": exposure,
             "endpoints_native_reference": [[100., frame*10.], [200., frame*10.]],
             "endpoints_native_source": [[101., frame*10.], [201., frame*10.]],
             "recall_review": {"status": status, "priority": priority}}
@@ -337,6 +337,22 @@ def test_summary_names_the_file_only_and_keeps_the_path_in_its_tooltip(make, ses
     assert view.summary.toolTip().endswith("DSC_0002.NEF") and "someone" in view.summary.toolTip()
 
 
+def test_summary_shows_the_exposure_time_when_the_view_has_it(make, session):
+    session["candidates"][1]["exptime_s"] = 2.5
+    session["candidates"][4]["exptime_s"] = None
+    view = make(session)
+    view.select_candidate("light_00002-1")
+    assert view.summary.text().startswith("light_00002-1 · DSC_0002.NEF · 曝光 2.5 秒\n")
+    view.select_candidate("light_00003-1")
+    assert "DSC_0003.NEF · 曝光 10 秒\n" in view.summary.text()
+    view.select_candidate("light_00004-1")
+    assert "曝光" not in view.summary.text() and "DSC_0004.NEF\n" in view.summary.text()
+    i18n.set_language("en")
+    english = make(session)
+    english.select_candidate("light_00003-1")
+    assert "DSC_0003.NEF · exposure 10 s\n" in english.summary.text()
+
+
 # ---- composite list ------------------------------------------------------------------------------
 
 DRIVE = re.compile(r"(?<![A-Za-z])[A-Za-z]:[\\/]|\\\\")
@@ -373,14 +389,15 @@ def test_manifest_rows_are_the_published_keeps_with_header_facts(session, tmp_pa
     assert row["source_sha256"] == row["stacked_input_sha256"] == f"{3:064x}"
     assert row["capture_time_utc"] == "2026-12-14T22:00:50Z"
     assert row["capture_time_local"] == "2026-12-15T06:00:50+08:00"
-    assert "exposure_s" not in row and list(row) == list(trail_manifest.COLUMNS)
+    assert row["exposure_s"] == 10.0 and list(row) == list(trail_manifest.COLUMNS)
     assert (row["x1"], row["y1"], row["x2"], row["y2"]) == (100., 30., 200., 30.)
     assert (row["identity"], row["identity_source"], row["keep_source"]) == ("meteor", "algorithm", "algorithm")
     header = manifest["header"]
     assert "time_zone" not in header and header["capture_time_basis"].startswith("FITS DATE-OBS (UT)")
     assert header["capture_time_local_zone"] == "UTC+08:00"
     assert header["added_back_by"] == {"algorithm": 1, "human": 0, "agent": 0}
-    assert header["source_file_basis"] == {"import_record_of_this_session": 0, "stacked_input": 1}
+    assert header["source_file_basis"] == {"import_record_of_this_session": 0, "import_record_found_in_cache": 0,
+                                           "stacked_input": 1}
     assert header["reference_frame"] == {"file": "DSC_0003.NEF", "stacked_input": "DSC_0003.NEF", "frame_index": 3,
                                          "capture_time_local": "2026-12-15T06:00:50+08:00",
                                          "capture_time_utc": "2026-12-14T22:00:50Z",
@@ -389,7 +406,10 @@ def test_manifest_rows_are_the_published_keeps_with_header_facts(session, tmp_pa
     assert header["segment"]["first_capture_time_local"] == "2026-12-15T06:00:10+08:00"
     assert header["segment"]["last_capture_time_utc"] == "2026-12-14T22:00:50Z"
     assert header["segment"]["frames_with_capture_time"] == 3
-    assert header["exposure"] == {"input_total_s": 50.0, "stacked_total_s": 40.0, "per_frame": "not in the review data"}
+    assert header["exposure"]["input_total_s"] == 50.0 and header["exposure"]["stacked_total_s"] == 40.0
+    assert header["exposure"]["per_row"].startswith("exposure_s: the row's exposure time in seconds")
+    assert header["format"] == "aester-composite-list-3"
+    assert any(note.startswith("exposure_s 是每行那张曝光的时长") for note in header["notes"])
     assert header["not_scanned"] == {"count": 1, "frames": [{"frame_index": 5, "file": "DSC_0005.NEF",
                                                              "reason": "quality_gate",
                                                              "details": ["stars 0.34x median"]}]}
@@ -397,6 +417,7 @@ def test_manifest_rows_are_the_published_keeps_with_header_facts(session, tmp_pa
     assert any("线性母版" in note and "不含流星" in note for note in header["notes"])
     assert any("世界时" in note and "差整小时" in note for note in header["notes"])
     assert not any("工作副本" in note for note in header["notes"])        # NEF inputs: no working copies
+    assert not any("转换时记下" in note for note in header["notes"]) and trail_manifest.working_copy_rows(manifest) == 0
 
 
 def test_manifest_names_the_originals_behind_dng_working_copies(session, tmp_path):
@@ -424,16 +445,159 @@ def test_manifest_names_the_originals_behind_dng_working_copies(session, tmp_pat
     header = manifest["header"]
     assert header["reference_frame"]["file"] == "DSC_0003.NEF" and header["reference_frame"]["stacked_input"] == "DSC_0003.dng"
     assert header["not_scanned"]["frames"][0]["file"] == "DSC_0005.NEF"
-    assert header["source_file_basis"] == {"import_record_of_this_session": 1, "stacked_input": 0}
+    assert header["source_file_basis"] == {"import_record_of_this_session": 1, "import_record_found_in_cache": 0,
+                                           "stacked_input": 0}
     assert not any("工作副本" in note for note in header["notes"])
+    # The original's hash comes from the record, not from reading the original again; the list says so.
+    assert any("转换时记下的原片哈希" in note and "没有重新读取原片" in note for note in header["notes"])
+    assert trail_manifest.working_copy_rows(manifest) == 0
     # Without that record (a restart), or for a DNG that changed since: the stacked DNG, said plainly.
     for known in ({}, {key: {**value, "input_sha256": "0" * 64} for key, value in originals.items()}):
         manifest = trail_manifest.build(session, job, workflow, originals=known)
         row = manifest["rows"][0]
         assert (row["source_file"], row["source_sha256"]) == ("DSC_0003.dng", f"d{3:063x}")
         assert any("工作副本" in note and "主干相同" in note for note in manifest["header"]["notes"])
+        assert not any("转换时记下" in note for note in manifest["header"]["notes"])
+        assert trail_manifest.working_copy_rows(manifest) == 1
     text = trail_manifest.csv_text(trail_manifest.build(session, job, workflow, originals=originals))
     assert not DRIVE.search(text) and "raw-imports" not in text and "shots" not in text
+
+
+def test_manifest_exposure_column_is_empty_when_the_view_has_no_usable_time(session, tmp_path):
+    def exported(value):
+        session["candidates"][3]["exptime_s"] = value
+        manifest = trail_manifest.build(session, _job(tmp_path), _workflow(tmp_path, session, ["light_00003-1"]))
+        table = [line for line in trail_manifest.csv_text(manifest).splitlines() if not line.startswith("#")]
+        return manifest["rows"][0]["exposure_s"], list(csv.DictReader(table))[0]["exposure_s"]
+
+    for value in (None, "10.", 0.0, -1.0, float("nan"), float("inf"), True):
+        assert exported(value) == (None, ""), value
+    assert exported(30) == (30, "30") and exported(2.5) == (2.5, "2.5")
+
+
+def _cached_job(tmp_path, session):
+    """A job that stacked the DNG working copies of an import record in tmp_path/cache (no app session map).
+
+    The record names DSC_000n.NEF (sha n) for DSC_000n.dng (sha dn); no DNG or original file exists.
+    """
+    from test_raw_import_sources import write_record
+    cache = tmp_path / "cache"
+    _, record, inputs = write_record(cache, count=5)
+    job = _job(tmp_path)
+    for entry, path, output in zip(job["inputs"], inputs, record["outputs"]):
+        entry.update(path=path, sha256=output["sha256"])
+    job["diagnostics"]["reference_input"] = job["inputs"][2]["path"]
+    for candidate in session["candidates"]:
+        entry = job["inputs"][candidate["frame_index"] - 1]
+        candidate.update(input=entry["path"], input_sha256=entry["sha256"])
+    return cache, job
+
+
+def _snapshot(root):
+    return sorted((str(p), p.stat().st_size, p.stat().st_mtime_ns) for p in Path(root).rglob("*"))
+
+
+def test_manifest_after_a_restart_names_the_originals_from_the_cache_record(session, tmp_path):
+    cache, job = _cached_job(tmp_path, session)
+    workflow = _workflow(tmp_path, session, ["light_00003-1"])
+    before = _snapshot(cache)
+    originals = trail_manifest.with_cache_records(job, {}, str(cache))
+    assert _snapshot(cache) == before and len(originals) == 5
+    manifest = trail_manifest.build(session, job, workflow, originals=originals)
+    row = manifest["rows"][0]
+    assert (row["source_file"], row["source_sha256"]) == ("DSC_0003.NEF", f"{3:064x}")
+    assert (row["stacked_input"], row["stacked_input_sha256"]) == ("DSC_0003.dng", f"d{3:063x}")
+    header = manifest["header"]
+    assert header["source_file_basis"] == {"import_record_of_this_session": 0, "import_record_found_in_cache": 1,
+                                           "stacked_input": 0}
+    assert header["reference_frame"]["file"] == "DSC_0003.NEF"
+    assert header["not_scanned"]["frames"][0]["file"] == "DSC_0005.NEF"
+    assert not any("工作副本" in note for note in header["notes"])
+    assert any("转换时记下的原片哈希" in note for note in header["notes"])
+    text = trail_manifest.csv_text(manifest)
+    assert not DRIVE.search(text) and "raw-imports" not in text and "shots" not in text
+    # Without a cache folder nothing is looked up.
+    assert trail_manifest.with_cache_records(job, {}, None) == {}
+    assert trail_manifest.with_cache_records(job, None, "") == {}
+
+
+def test_a_cache_record_whose_dng_hash_differs_from_the_job_is_dropped(session, tmp_path):
+    cache, job = _cached_job(tmp_path, session)
+    job["inputs"][2]["sha256"] = "0" * 64                  # the job stacked a different file at that path
+    session["candidates"][3]["input_sha256"] = "0" * 64
+    originals = trail_manifest.with_cache_records(job, {}, cache)
+    assert len(originals) == 4 and trail_manifest._path_key(job["inputs"][2]["path"]) not in originals
+    manifest = trail_manifest.build(session, job, _workflow(tmp_path, session, ["light_00003-1"]), originals=originals)
+    row = manifest["rows"][0]
+    assert (row["source_file"], row["source_sha256"]) == ("DSC_0003.dng", "0" * 64)
+    assert manifest["header"]["source_file_basis"] == {"import_record_of_this_session": 0,
+                                                       "import_record_found_in_cache": 0, "stacked_input": 1}
+    assert any("工作副本" in note and "相符的转换记录" in note for note in manifest["header"]["notes"])
+
+
+def test_this_sessions_conversions_win_and_the_cache_is_asked_only_for_the_rest(session, tmp_path, monkeypatch):
+    from starstack import raw_import
+    cache, job = _cached_job(tmp_path, session)
+    third = trail_manifest._path_key(job["inputs"][2]["path"])
+    mine = {third: {"file": "MINE_0003.NEF", "sha256": "1" * 64, "input_sha256": f"d{3:063x}"}}
+    calls, real = [], raw_import.import_sources_for
+    monkeypatch.setattr(raw_import, "import_sources_for",
+                        lambda paths, root: calls.append((paths, root)) or real(paths, root))
+    originals = trail_manifest.with_cache_records(job, mine, cache)
+    assert calls == [([entry["path"] for number, entry in enumerate(job["inputs"]) if number != 2], cache)]
+    assert originals[third] == mine[third] and len(originals) == 5
+    manifest = trail_manifest.build(session, job, _workflow(tmp_path, session, ["light_00001-1", "light_00003-1"]),
+                                    originals=originals)
+    assert [row["source_file"] for row in manifest["rows"]] == ["DSC_0001.NEF", "MINE_0003.NEF"]
+    assert manifest["header"]["source_file_basis"] == {"import_record_of_this_session": 1,
+                                                       "import_record_found_in_cache": 1, "stacked_input": 0}
+    # Every input named by this session: the cache is not asked; a failing lookup adds nothing.
+    calls.clear()
+    everything = trail_manifest.with_cache_records(job, originals, cache)
+    assert calls == [] and everything == originals
+
+    def offline(paths, root):
+        raise OSError("offline")
+    monkeypatch.setattr(raw_import, "import_sources_for", offline)
+    assert trail_manifest.with_cache_records(job, mine, cache) == mine
+
+
+def test_the_jobs_own_cache_folder_is_asked_before_the_one_in_settings(session, tmp_path, monkeypatch):
+    """The cache setting changed after the job ran: the job's inputs lie under the folder it was made in."""
+    from starstack import raw_import
+    cache, job = _cached_job(tmp_path, session)
+    settings = tmp_path / "new cache"
+    settings.mkdir()
+    paths = [entry["path"] for entry in job["inputs"]]
+    # Only the folder set in Settings now: no record there, so the list would name the DNG working copies.
+    assert trail_manifest.with_cache_records(job, {}, [str(settings)]) == {}
+    calls, real = [], raw_import.import_sources_for
+    monkeypatch.setattr(raw_import, "import_sources_for",
+                        lambda paths, root: calls.append((paths, root)) or real(paths, root))
+    # The job's own folder first: everything is named there and the Settings folder is not asked.
+    found = trail_manifest.with_cache_records(job, {}, trail_manifest.cache_folders(str(cache), str(settings)))
+    assert len(found) == 5 and all(entry["basis"] == "import_record_found_in_cache" for entry in found.values())
+    assert calls == [(paths, str(cache))]
+    # Each later folder is asked only for the inputs the earlier ones did not name.
+    calls.clear()
+    job["inputs"][1]["sha256"] = "0" * 64                  # the record no longer matches this input
+    found = trail_manifest.with_cache_records(job, {}, [str(cache), str(settings)])
+    assert len(found) == 4 and calls == [(paths, str(cache)), ([paths[1]], str(settings))]
+    # In the other order the Settings folder finds nothing and the job's folder still names the rest.
+    calls.clear()
+    assert len(trail_manifest.with_cache_records(job, {}, [str(settings), str(cache)])) == 4
+    assert calls == [(paths, str(settings)), (paths, str(cache))]
+    # A folder that fails is passed over; the same folder given twice is asked once.
+    calls.clear()
+
+    def flaky(paths, root):
+        if root == "offline":
+            raise OSError("offline")
+        return real(paths, root)
+    monkeypatch.setattr(raw_import, "import_sources_for", lambda paths, root: calls.append(root) or flaky(paths, root))
+    assert len(trail_manifest.with_cache_records(job, {}, ["offline", str(cache), str(cache).upper(), None])) == 4
+    assert calls == ["offline", str(cache)] if os.name == "nt" else calls[:2] == ["offline", str(cache)]
+    assert trail_manifest.cache_folders(None, "", str(cache), str(cache)) == [str(cache)]
 
 
 def test_manifest_keep_source_is_the_published_one_not_the_draft(session, tmp_path):
@@ -520,6 +684,44 @@ def test_export_passes_this_sessions_originals_and_time_zone(make, session, tmp_
     (tmp_path / "lists").mkdir()
     assert view.export_manifest(tmp_path / "lists" / "x.csv")
     assert seen == [{"originals": originals, "zone": BEIJING}]
+
+
+def test_export_after_a_restart_names_the_originals_from_the_cache(make, session, tmp_path, monkeypatch):
+    """No in-session conversion map (the app was restarted): the window's cache folder supplies the names."""
+    from starstack import core
+    cache, job = _cached_job(tmp_path, session)
+    monkeypatch.setattr(core, "load_job", lambda directory: job)
+    workflow = _workflow(tmp_path, session, ["light_00003-1"])
+    (tmp_path / "lists").mkdir()
+    before = _snapshot(cache)
+    # The Settings folder changed since the job ran; the job's own cache folder comes first and names it.
+    (tmp_path / "new cache").mkdir()
+    view = make(session, workflow=workflow, originals={}, cache_roots=[str(cache), str(tmp_path / "new cache")])
+    csv_path, json_path = view.export_manifest(tmp_path / "lists" / "after-restart.csv")
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    assert (data["rows"][0]["source_file"], data["rows"][0]["stacked_input"]) == ("DSC_0003.NEF", "DSC_0003.dng")
+    assert data["header"]["source_file_basis"]["import_record_found_in_cache"] == 1
+    assert data["rows"][0]["exposure_s"] == 10.0 and _snapshot(cache) == before
+    assert "raw-imports" not in csv_path.read_text(encoding="utf-8-sig")
+    assert "加回 1 条" in view.status.text() and "DNG 的文件名" not in view.status.text()
+    # One folder may be given on its own.
+    assert make(session, workflow=workflow, cache_roots=str(cache)).cache_roots == [str(cache)]
+    # Without a cache folder, or only one that holds no record: the stacked working copy, said plainly, and the
+    # status line says so too (the user need not open the file to find out).
+    for roots in (None, [str(tmp_path / "new cache")]):
+        plain = make(session, workflow=workflow, cache_roots=roots)
+        written = plain.export_manifest(tmp_path / "lists" / "plain.csv", confirm_overwrite=lambda name: True)
+        data = json.loads(written[1].read_text(encoding="utf-8"))
+        assert data["rows"][0]["source_file"] == "DSC_0003.dng"
+        assert data["header"]["source_file_basis"] == {"import_record_of_this_session": 0,
+                                                       "import_record_found_in_cache": 0, "stacked_input": 1}
+        assert "其中 1 条写的是叠加所用 DNG 的文件名（没有找到相符的转换记录）。" in plain.status.text()
+    i18n.set_language("en")
+    try:
+        plain.export_manifest(tmp_path / "lists" / "plain.csv", confirm_overwrite=lambda name: True)
+        assert "Rows that name the stacked DNG (no matching conversion record was found): 1." in plain.status.text()
+    finally:
+        i18n.set_language("zh_CN")
 
 
 def test_export_is_disabled_without_a_trails_version(make, session):

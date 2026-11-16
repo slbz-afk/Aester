@@ -646,3 +646,36 @@ def test_thumbnail_with_hash_keeps_the_verified_path(job_directory):
     png.unlink()
     with pytest.raises(ValueError, match="候选缩略图缺失、已改变或缺少内容校验"):
         review.read_review(session["session_path"])
+
+
+@pytest.mark.parametrize("value, expected", [
+    ("10.", 10.0), ("10", 10.0), (" 2.5 ", 2.5), ("1.0D+01", 10.0), ("3E-1", .3), (30, 30.0), (0.5, .5),
+    (None, None), ("", None), ("abc", None), ("0", None), ("0.", None), ("-1.", None), ("nan", None),
+    ("inf", None), ("1e400", None), (float("inf"), None), (float("nan"), None), (-2, None), (True, None),
+    (10**400, None), ([10], None), ({"value": 10}, None),
+])
+def test_exposure_seconds_is_a_positive_finite_number_or_none(value, expected):
+    assert review._exposure_seconds(value) == expected
+
+
+def test_view_carries_each_exposures_time_and_writes_nothing_new(job_directory):
+    """exptime_s comes from provenance.exptime (FITS EXPTIME as text); the record and the draft stay as they were."""
+    assert [c["exptime_s"] for c in review.open_review(str(job_directory))["candidates"]] == [None, None]
+    job = json.loads((job_directory / "job.json").read_text())
+    record = json.loads(Path(job["transient_revision"]["record"]).read_text())
+    record["candidates"][0]["provenance"]["exptime"] = "10."
+    record["candidates"][1]["provenance"]["exptime"] = "nan"
+    target = job_directory / "products" / "revision2"
+    target.mkdir()
+    revision = prepare(target, record)
+    change_job(job_directory, lambda value: value.update(transient_revision=revision))
+    stored = Path(revision["record"]).read_bytes()
+    session = review.open_review(str(job_directory))
+    assert [c["exptime_s"] for c in session["candidates"]] == [10.0, None]
+    assert Path(revision["record"]).read_bytes() == stored
+    draft = Path(session["session_path"]).read_text(encoding="utf8")
+    assert "exptime" not in draft and "candidates" not in json.loads(draft)
+    saved = save(session, {"light_00001-1": {"override": "keep"}})
+    assert [c["exptime_s"] for c in saved["candidates"]] == [10.0, None]
+    assert [c["exptime_s"] for c in review.read_review(session["session_path"])["candidates"]] == [10.0, None]
+    assert "exptime" not in Path(session["session_path"]).read_text(encoding="utf8")
