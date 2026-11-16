@@ -33,7 +33,7 @@ The window follows six stages:
 - **Preserve meteors and trails**: the base image is finished first. Meteors the algorithm considers reliable are then added back automatically and saved as a separate version; other trails are left for you to review. You can check and change each decision under **Review trail candidates** and render again. Review uses the job's cache, so do not clean it before you have finished reviewing.
 - **Enhance the Milky Way**: a graded enhancement inside the drawn Milky Way ellipse only.
 
-For meteor showers, see the [illustrated walkthrough](docs/METEOR_SHOWER_EN.md) (written for versions after v1.0.0-rc.1).
+For meteor showers, see the [illustrated walkthrough](docs/METEOR_SHOWER_EN.md) (v1.0.0-rc.2 and later).
 
 See the [user guide](docs/USER_GUIDE_EN.md) for details.
 
