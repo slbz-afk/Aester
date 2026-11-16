@@ -1371,7 +1371,9 @@ def create_server(workspace: WorkspaceTools | None = None):
 
         application_policy_version=meteor-default-keep-1 时量测可靠的流星默认保留；每条候选含 identity/identity_source
         （human/agent/algorithm）、default_keep、effective_keep（含已存草稿，明确覆盖优先）与 keep_source；options.export_trail_layer；
-        preview_path 优先当前含亮迹成片，base_preview_path 为不含亮迹的基础成片。"""
+        preview_path 优先当前含亮迹成片，base_preview_path 为不含亮迹的基础成片。
+        review_png 是扫描时生成的缩略图，未核对此后是否被改动（见各候选 preview_note），仅供浏览；判断以
+        trail_candidate_context 的实际曝光对照为准。"""
         return await asyncio.to_thread(service.open_trail_review, workflow_dir)
 
     @tool()
