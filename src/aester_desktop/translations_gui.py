@@ -746,6 +746,12 @@ EN.update({
     '版本 {0}': 'Version {0}',
 })
 
+# Trail review readout: automatic keeps and the high-priority review count.
+EN.update({
+    '自动加回 {0} 条': '{0} added back automatically',
+    '高优先待看 {0} 条（共 {1} 条待核实）': '{0} high priority to check ({1} unverified in all)',
+})
+
 # Meteor-shower mode, the cache estimate before start, recent tasks and the progress read-out.
 EN.update({
     '流星雨合成': 'Meteor shower',

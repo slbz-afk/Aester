@@ -83,7 +83,7 @@ def test_english_trail_labels_keep_machine_decisions(app, session, monkeypatch):
 def test_dialog_catalog_covers_literals_and_format_fields():
     from aester_desktop.translations_dialogs import EN
     catalog = i18n.english_catalog()
-    for name in ('region_dialog', 'trail_review_dialog', 'advanced_tools'):
+    for name in ('region_dialog', 'trail_review_dialog', 'advanced_tools', 'trail_manifest'):
         source = Path(__file__).resolve().parents[2]/'src/aester_desktop'/(name+'.py')
         for node in ast.walk(ast.parse(source.read_text(encoding='utf8'))):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'tr' and node.args:

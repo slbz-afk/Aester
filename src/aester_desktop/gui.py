@@ -431,6 +431,9 @@ class MainWindow(QMainWindow):
         self._regions_saved_by_user: dict[str, Any] | None = None  # identity of the last editor save
         self.input_files: list[str] = []
         self._import_originals: dict[str, str] = {}
+        # Every RAW-to-DNG conversion of this session (stacked DNG -> original name and hashes), kept across
+        # selections so a composite list can name the photographs the user shot.
+        self._import_sources: dict[str, dict] = {}
         self._import_cancel = None
         self._finite_backend_info = {}
         self._reference_generation = 0
@@ -2467,6 +2470,8 @@ class MainWindow(QMainWindow):
             self._import_cancel = None
             self.input_files = list(result['input_files'])
             self._import_originals = dict(zip(result['input_files'], result['originals']))
+            from aester_desktop.trail_manifest import import_sources
+            self._import_sources.update(import_sources(result))
             self._selection_changed()
             if result['converted']:
                 self.message_label.setText(tr('已导入 DNG 兼容副本；原 RAW 保持原位，来源记录保存在缓存。'))
@@ -2833,7 +2838,7 @@ class MainWindow(QMainWindow):
             self._update_controls()
             if self.workflow_dir != directory:
                 return
-            dialog = TrailReviewDialog(session, self)
+            dialog = TrailReviewDialog(session, self, workflow=self._workflow, originals=self._import_sources)
             if dialog.exec() != QDialog.DialogCode.Accepted:
                 self.message_label.setText(tr('亮迹复核已关闭；已保存草稿可继续编辑。'))
                 return
@@ -3275,19 +3280,31 @@ class MainWindow(QMainWindow):
             self.preview_note.setToolTip("")
 
     def _trails_note(self) -> str:
-        """'含亮迹版本 · 已加回 N 条（算法 a / 人工 h / Agent g）· 另有 M 条待核实' (contract B), or ''."""
+        """'含亮迹版本 · 自动加回 N 条 · 高优先待看 H 条（共 M 条待核实）' (contract B), or ''.
+
+        With human or Agent keeps the count is split by source; without a recorded high-priority count
+        (older records) the pending part stays '另有 M 条待核实'.
+        """
         record = self._workflow or {}
         if not self._has_trails_version(record):
             return ''
         review = record.get("trail_review") or {}
         parts = [tr('含亮迹版本')]
+        count = lambda value: isinstance(value, int) and not isinstance(value, bool)
         kept = review.get("kept_count")
-        if isinstance(kept, int) and not isinstance(kept, bool):
+        if count(kept):
             by = review.get("kept_by") or {}
-            parts.append(tr('已加回 {0} 条（算法 {1} / 人工 {2} / Agent {3}）', kept, int(by.get("algorithm") or 0),
-                            int(by.get("human") or 0), int(by.get("agent") or 0)))
+            algorithm, human, agent = (int(by.get(key) or 0) for key in ("algorithm", "human", "agent"))
+            if algorithm == kept and not human and not agent:
+                parts.append(tr('自动加回 {0} 条', kept))
+            else:
+                parts.append(tr('已加回 {0} 条（算法 {1} / 人工 {2} / Agent {3}）', kept, algorithm, human, agent))
         pending = review.get("pending_count")
-        if isinstance(pending, int) and not isinstance(pending, bool) and pending > 0:
+        # The recall review's high priority (a hint for what to look at first, not a confidence).
+        high = ((((review.get("scan") or {}).get("summary") or {}).get("recall_review") or {}).get("high_priority"))
+        if count(pending) and pending > 0 and count(high):
+            parts.append(tr('高优先待看 {0} 条（共 {1} 条待核实）', high, pending))
+        elif count(pending) and pending > 0:
             parts.append(tr('另有 {0} 条待核实', pending))
         elif pending is None and record.get("needs_review"):
             parts.append(tr('仍有候选待核实'))
