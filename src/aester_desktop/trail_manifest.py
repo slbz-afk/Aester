@@ -10,8 +10,8 @@ directory or user-profile path is written.
 
 Capture times: a candidate's ``date_obs`` is the converted frame's FITS DATE-OBS, the observation start
 in UT. For camera RAW, Siril converts the camera's clock time to UT with the processing computer's time
-zone, so converting it back with this computer's zone gives the camera clock when the camera, the
-processing computer and this computer use the same zone.
+zone, so converting it back on the processing computer gives the camera clock, whatever zone the camera
+was set to; the UT itself is right only when the camera clock was set to that computer's zone.
 
 Exposure: ``exposure_s`` is the review view's ``exptime_s``, the converted frame's FITS EXPTIME in seconds
 (empty when it was not recorded); the header keeps the segment totals.
@@ -375,7 +375,7 @@ def build(session: dict, job: dict, workflow: dict | None, *, originals: dict | 
                                        (session.get("geometry") or {}).get("height")]},
         "image_rotation_deg": request.get("image_rotation") or 0,
         "notes": [
-            tr('拍摄时刻：capture_time_utc 是世界时，capture_time_local 按这台电脑的时区换算。相机 RAW 的世界时由 Siril 按处理时电脑的时区从相机时间换算，所以相机和电脑设在同一时区时，本地时刻就是相机上的时间；相机设在别的时区时会差整小时。'),
+            tr('拍摄时刻：capture_time_utc 是世界时，capture_time_local 按这台电脑的时区换算。相机 RAW 的世界时由 Siril 按处理时电脑的时区从相机时间换算，所以在处理这个任务的电脑上导出时，本地时刻就是相机上的时间；相机时钟设在别的时区时，差整小时的是世界时。'),
             tr('含亮迹版本里的线性母版（master_scene_linear.tif）不含流星；流星只加在成片（final_srgb16.tif、final.jpg）里。'),
             tr('身份是算法建议或复核者的选择，不是认证；同一张曝光的一颗流星可能有多条候选。'),
             tr('未扫描的帧（质量门剔除或未能对齐）里即使有流星，也不在本清单中。'),
