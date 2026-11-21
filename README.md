@@ -10,9 +10,9 @@ Aester 永久免费、开源，无需账号。
 
 [English](README.en.md) · [下载](https://github.com/slbz-afk/Aester/releases) · [使用指南](docs/USER_GUIDE.md) · [问题反馈](https://github.com/slbz-afk/Aester/issues) · [支持开发](SUPPORT.md)
 
-![Aester 界面：腾格里沙漠 48 张连拍合成，流星由算法自动判断后加回](docs/images/aester-zh.png)
+![Aester 界面：腾格里沙漠 48 张合成，亮迹由算法自动判断后加回](docs/images/aester-zh.png)
 
-*腾格里沙漠 48 张连拍合成。流星由算法自动判断后加回，可能判错；可在“复核亮迹候选”里逐条查看和修改。*
+*腾格里沙漠 48 张合成（从 144 张连拍里每 3 张取 1 张）。算法自动加回了 9 条亮迹，作者逐条复核：6 条是流星，另 3 条多半是飞机或卫星反光。识别会出错，可在“复核亮迹候选”里逐条查看和修改。*
 
 ## 使用入门
 

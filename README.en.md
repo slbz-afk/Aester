@@ -10,9 +10,9 @@ Aester is free forever and open source, and needs no account. Supporting develop
 
 [中文](README.md) · [Download](https://github.com/slbz-afk/Aester/releases) · [User guide](docs/USER_GUIDE_EN.md) · [Issues](https://github.com/slbz-afk/Aester/issues) · [Support](SUPPORT.md)
 
-![Aester: 48 frames of the Tengger Desert stacked, with meteors that the algorithm judged and added back automatically](docs/images/aester-en.png)
+![Aester: 48 frames of the Tengger Desert stacked, with trails that the algorithm judged and added back automatically](docs/images/aester-en.png)
 
-*48 frames of the Tengger Desert stacked. The meteors were judged and added back automatically, and some judgements can be wrong; you can check and change each one under **Review trail candidates**.*
+*48 frames of the Tengger Desert stacked (every third frame of a 144-frame sequence). The algorithm added back 9 trails automatically; on review, the photographer judged 6 of them to be meteors and the other 3 most likely an aircraft or satellite glints. Judgements can be wrong; you can check and change each one under **Review trail candidates**.*
 
 ## How it works
 

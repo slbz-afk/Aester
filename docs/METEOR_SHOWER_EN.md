@@ -22,7 +22,7 @@ Click **Start stacking**. When the job is done, the result tabs read **With trai
 
 Click **Open photographs folder**, at the top right of the image, to get the photographs. It opens the with-trails folder: `final.jpg` and the 16-bit `final_srgb16.tif` in it are the photograph with meteors (the linear master has none); the `delivery-<token>` folder next to it holds the base photograph without meteors, for comparison or your own editing.
 
-Trails added back automatically are the algorithm's suggestion, not proof of what they are. In the screenshot, 9 were added back. This example uses every third frame; with all frames, the algorithm reclassified 3 of these 9 as satellites, which is why you should add every frame (see “Shooting and segments” in the guide). For processing time there are only simulated figures so far; see the guide.
+Trails added back automatically are the algorithm's suggestion, not proof of what they are. In the screenshot, 9 were added back. This example uses every third frame; with all frames, the algorithm reclassified 3 of these 9 as satellites, which is why you should add every frame (see “Shooting and segments” in the guide). The photographer checked each one: 6 of the 9 are meteors, and the 3 reclassified ones are indeed not. For processing time there are only simulated figures so far; see the guide.
 
 ## 3. Review: start with what was added back
 
