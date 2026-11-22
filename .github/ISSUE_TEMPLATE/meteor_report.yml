@@ -107,6 +107,11 @@ body:
       label: 最终没有加回的有几条
       description: 包括你复核后决定不加回的，以及没看的“待核实”候选；写个大概即可
   - type: input
+    id: missed_seen
+    attributes:
+      label: 拍摄时看到、但含亮迹成片和复核列表里都没有的流星有几条
+      description: 写看到的亮流星大概几条、其中几条两处都没有、是否贴近地平线，以及拍到它的那张是否列在合成清单表头的“没有扫描”里；都在就写“都在”；没留意或没对照就写“没看”
+  - type: input
     id: review_minutes
     attributes:
       label: 复核用了多少分钟
