@@ -10,9 +10,9 @@ Aester is free forever and open source, and needs no account. Supporting develop
 
 [中文](README.md) · [Download](https://github.com/slbz-afk/Aester/releases) · [User guide](docs/USER_GUIDE_EN.md) · [Issues](https://github.com/slbz-afk/Aester/issues) · [Support](SUPPORT.md)
 
-![Aester: 48 frames of the Tengger Desert stacked, with meteors that the algorithm judged and added back automatically](docs/images/aester-en.png)
+![Aester: 48 frames of the Tengger Desert stacked, with trails that the algorithm judged and added back automatically](docs/images/aester-en.png)
 
-*48 frames of the Tengger Desert stacked. The meteors were judged and added back automatically, and some judgements can be wrong; you can check and change each one under **Review trail candidates**.*
+*48 frames of the Tengger Desert stacked (every third frame of a 144-frame sequence). The algorithm added back 9 trails automatically; on review, the photographer judged 6 of them to be meteors and the other 3 most likely an aircraft or satellite glints. Judgements can be wrong; you can check and change each one under **Review trail candidates**.*
 
 ## How it works
 
@@ -32,6 +32,8 @@ The window follows six stages:
 
 - **Preserve meteors and trails**: the base image is finished first. Meteors the algorithm considers reliable are then added back automatically and saved as a separate version; other trails are left for you to review. You can check and change each decision under **Review trail candidates** and render again. Review uses the job's cache, so do not clean it before you have finished reviewing.
 - **Enhance the Milky Way**: a graded enhancement inside the drawn Milky Way ellipse only.
+
+For meteor showers, see the [illustrated walkthrough](docs/METEOR_SHOWER_EN.md) (v1.0.0-rc.2 and later).
 
 See the [user guide](docs/USER_GUIDE_EN.md) for details.
 
@@ -82,7 +84,7 @@ Run `starstack devices` for the full list. Reports with your camera are welcome.
 
 - **Not every scene comes out right straight away.** Clouds, obstructions, trees moving in the wind, strong light pollution and colour fringing remain hard. Deep-sky images from smart telescopes have basic support only.
 - **At most 300 photos per job.** Split longer sequences into segments; each segment gives its own image, and segments are not combined automatically. The longest continuous sequence tested so far is about 31 minutes; until longer ones are tested, keep each segment to about 30 minutes and no more than about 150 photos, whichever comes first.
-- **Meteor identification is not guaranteed.** A trail added back automatically may still be a satellite or an aircraft, and meteors can be missed; check them under **Review trail candidates**.
+- **Meteor identification is not guaranteed.** A trail added back automatically may still be a satellite or an aircraft, and meteors can be missed; check them under **Review trail candidates**. A bright meteor can also be missed entirely and is then not in the review list either, so if you saw one while shooting, check that it is in the with-trails photograph; see “Not tested yet and known issues” in the [user guide](docs/USER_GUIDE_EN.md#meteor-shower).
 - **Reduce stars is not available.** It needs the optional nox model; the rights to that third-party model's training data are still being checked, so it is not offered for download. When it is, it remains an algorithmic estimate; bright stars may keep a residual halo.
 - **Retouching needs GIMP 3.2.6** and your own AI assistant with MCP and image support.
 - **Little testing on other PCs.** Testing on other computers and on high-DPI multi-monitor setups is still limited. Please [report problems](https://github.com/slbz-afk/Aester/issues).

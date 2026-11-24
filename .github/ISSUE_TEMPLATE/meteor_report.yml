@@ -8,11 +8,11 @@ body:
       value: |
         谢谢你用 Aester 处理流星雨。这份回执帮我们了解它在真实拍摄中好不好用，每一项都可以写个大概。
 
-        **请不要在这里上传 RAW 原片。** issue 是公开的，任何人都能下载；照片里还可能带有 GPS 位置和机身序列号。
+        **请不要在这里上传 RAW 原片。** issue 是公开的，任何人都能下载；照片里还可能带有 GPS 位置和机身序列号。愿意把原片给我们做测试的，请发邮件到 aester-star-stacker@outlook.com 联系。
 
         不用 GitHub 的话，也可以把同样的内容发邮件到 aester-star-stacker@outlook.com。
 
-        This form is in Chinese; answers in English are welcome. Please do not upload RAW files here.
+        This form is in Chinese; answers in English are welcome. Please do not upload RAW files here. To offer RAW files for testing, email aester-star-stacker@outlook.com.
   - type: input
     id: version
     attributes:
@@ -39,6 +39,7 @@ body:
     id: night
     attributes:
       label: 拍摄的夜晚
+      description: 拍了不止一晚的，每晚各交一份回执，或在这里写上各晚
       placeholder: 2026-12-13 至 14 日夜
     validations:
       required: true
@@ -107,6 +108,11 @@ body:
       label: 最终没有加回的有几条
       description: 包括你复核后决定不加回的，以及没看的“待核实”候选；写个大概即可
   - type: input
+    id: missed_seen
+    attributes:
+      label: 拍摄时看到、但含亮迹成片和复核列表里都没有的流星有几条
+      description: 写看到的亮流星大概几条、其中几条两处都没有、是否贴近地平线，以及拍到它的那张是否列在合成清单表头的“没有扫描”里；都在就写“都在”；没留意或没对照就写“没看”
+  - type: input
     id: review_minutes
     attributes:
       label: 复核用了多少分钟
@@ -119,6 +125,18 @@ body:
         - 否
     validations:
       required: true
+  - type: dropdown
+    id: heard_from
+    attributes:
+      label: 你最早是从哪里知道 Aester 的
+      description: 帮我们了解大家从哪里听说 Aester，可以不填
+      options:
+        - 朋友、群友推荐
+        - 在网上看到别人发的介绍、帖子或视频
+        - 看到 Aester 维护者自己发的帖子、指南或视频
+        - 自己搜到（GitHub 或搜索引擎）
+        - 维护者直接联系过我
+        - 其他
   - type: textarea
     id: problems
     attributes:

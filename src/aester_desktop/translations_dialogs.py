@@ -164,8 +164,8 @@ EN.update({
     '先看哪些的提示，不是可信度。自动不加回的候选里，端点渐隐、碰到画框边或测量到边界的为“高”；已请求保留但未能测量的也为“高”。已加回或此前已明确选择的显示“—”；本窗口里的新选择应用后才更新。':
         'A hint for what to look at first, not a confidence. Among candidates not added back automatically, those with a fading end, an end at the frame edge or a measurement at its limit are High; so are keep requests that could not be measured. Candidates already added back or chosen earlier show “—”; choices made in this window update it after they are applied.',
     '复核优先级只是先看哪些的提示，不是可信度。': 'Review priority is a hint for what to look at first, not a confidence.',
-    '拍摄时刻，按这台电脑的时区显示。相机和电脑设在同一时区时就是相机上的时间；不同时会差整小时。':
-        'Capture time in this computer’s time zone. It matches the camera clock when the camera and this computer use the same zone; otherwise it is off by whole hours.',
+    '拍摄时刻，按这台电脑的时区显示。在处理这个任务的电脑上，它就是相机上的时间；相机时钟设在别的时区时，差整小时的是记录的世界时。':
+        'Capture time in this computer’s time zone. On the computer that processed this job it is the camera clock; if the camera clock was set to another zone, the recorded UT is what is off by whole hours.',
     '{0}（这台电脑的时区 {1}）\n记录的世界时：{2}': '{0} (this computer’s time zone, {1})\nRecorded UT: {2}',
     '沿轨迹的总信噪比（S/N），可当亮度参考：越大越明显；轨迹越长也越大，不等于亮度。':
         'Total S/N along the trail, a rough guide to brightness: higher means more distinct; it also grows with length, so it is not brightness.',
@@ -201,8 +201,8 @@ EN.update({
         'No version with trails matches the current candidate record, so no composite list can be exported.',
     '加回记录里的候选不在当前复核数据中，不能导出合成清单。':
         'A candidate in the add-back record is missing from the review data, so no composite list can be exported.',
-    '拍摄时刻：capture_time_utc 是世界时，capture_time_local 按这台电脑的时区换算。相机 RAW 的世界时由 Siril 按处理时电脑的时区从相机时间换算，所以相机和电脑设在同一时区时，本地时刻就是相机上的时间；相机设在别的时区时会差整小时。':
-        'Capture times: capture_time_utc is UT, and capture_time_local converts it to this computer’s time zone. For camera RAW, Siril derives UT from the camera clock with the processing computer’s time zone, so the local time is the camera clock when the camera and the computer use the same zone; with the camera set to another zone it is off by whole hours.',
+    '拍摄时刻：capture_time_utc 是世界时，capture_time_local 按这台电脑的时区换算。相机 RAW 的世界时由 Siril 按处理时电脑的时区从相机时间换算，所以在处理这个任务的电脑上导出时，本地时刻就是相机上的时间；相机时钟设在别的时区时，差整小时的是世界时。':
+        'Capture times: capture_time_utc is UT, and capture_time_local converts it to this computer’s time zone. For camera RAW, Siril derives UT from the camera clock with the processing computer’s time zone, so on the computer that processed the job the local time is the camera clock; if the camera clock was set to another zone, capture_time_utc is what is off by whole hours.',
     '含亮迹版本里的线性母版（master_scene_linear.tif）不含流星；流星只加在成片（final_srgb16.tif、final.jpg）里。':
         'The linear master in the version with trails (master_scene_linear.tif) contains no meteors; meteors are added only to the photographs (final_srgb16.tif, final.jpg).',
     '身份是算法建议或复核者的选择，不是认证；同一张曝光的一颗流星可能有多条候选。':
