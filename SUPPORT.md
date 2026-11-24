@@ -17,6 +17,12 @@ Aester is free to use. Supporting development is entirely optional and does not 
 
 ## 资金支持 / Financial support
 
-资金支持渠道正在准备，开通后会在这里公布。
+**中国大陆：微信支付。** 用微信扫下面的码即可赞助，码上的金额是 ¥15.99。赞助完全自愿：不解锁任何功能，也不影响 issue 和邮件的处理。
 
-Donation channels are being set up and will be listed here.
+**Mainland China: WeChat Pay.** Scan the code below with WeChat. The amount is set to ¥15.99. Sponsoring is voluntary: it unlocks nothing and does not change how issues or emails are handled.
+
+<img src="docs/images/support/wechat-pay.jpg" alt="微信支付收款码 / WeChat Pay code, ¥15.99" width="400">
+
+中国大陆以外的赞助渠道还在准备，开通后会在这里公布。
+
+Donation channels outside mainland China are being set up and will be listed here.
